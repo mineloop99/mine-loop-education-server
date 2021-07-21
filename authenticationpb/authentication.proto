@@ -1,0 +1,75 @@
+syntax = "proto3";
+package authentication;
+
+option go_package = "/authenticationpb";
+
+
+service Authentication {
+
+    // for test purpose only
+    rpc Testing (TestingRequest) returns (TestingRespone);
+
+    rpc Login (LoginRequest) returns (LoginRespone);
+
+    rpc AutoLogin (AutoLoginRequest) returns (AutoLoginRespone);
+
+    rpc CreateAccount (CreateAccountRequest) returns (CreateAccountRespone);
+
+    rpc EmailVerification (EmailVerificationRequest) returns (EmailVerificationRespone);
+
+    rpc EmailVerificationCode (EmailVerificationCodeRequest) returns (EmailVerificationCodeRespone);
+
+}
+
+message TestingRequest {
+}
+message TestingRespone {
+}
+
+message AccountInformation {
+    string user_email = 1;
+    string password = 2;
+}
+
+message AutoLoginRequest {
+    string device_unique_id = 1;
+}
+
+message AutoLoginRespone {
+    string token = 1;
+    int32 expiry_time_seconds = 2;
+}
+
+message LoginRequest {
+    AccountInformation account_information = 1;
+}   
+
+
+message LoginRespone {
+    string token = 1;
+    int32 expiry_time_seconds = 2;
+}
+
+message CreateAccountRequest {
+    AccountInformation account_information = 1;
+}
+
+message CreateAccountRespone {
+    bool create_status = 1;
+}
+
+message EmailVerificationRequest {
+    string email = 1;
+}
+
+message EmailVerificationRespone {
+    
+}
+
+message EmailVerificationCodeRequest {
+    string email = 1;
+    int32 code = 2;
+}
+message EmailVerificationCodeRespone {
+    bool verify_status = 1;
+}

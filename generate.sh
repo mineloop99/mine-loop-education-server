@@ -1,0 +1,1 @@
+protoc authenticationpb/authentication.proto --go_out=. --go-grpc_out=.
