@@ -3,14 +3,15 @@ package main
 import (
 	"context"
 	"fmt"
-	"go-protobuf/authentication/authenticationpb"
 	"log"
 	"net"
 	"os"
 	"os/signal"
 	"time"
 
-	authentication "go-protobuf/authentication/lib"
+	"github.com/wanatabeyuu/mine-loop-education-server/authentication/authenticationpb"
+
+	authentication "github.com/wanatabeyuu/mine-loop-education-server/authentication/lib"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
