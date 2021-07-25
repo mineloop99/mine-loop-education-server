@@ -237,7 +237,6 @@ func (*server) Login(ctx context.Context, in *authenticationpb.LoginRequest) (*a
 
 /////////////////////////////// AUTO LOGIN //////////////////////
 func (*server) AutoLogin(ctx context.Context, in *authenticationpb.AutoLoginRequest) (*authenticationpb.AutoLoginRespone, error) {
-	println("\nAutoLogin Revoke:\n")
 
 	//Read Token From Request Header
 	oldToken, readErr := authentication.ReadTokenFromHeader(ctx)
@@ -269,8 +268,6 @@ func (*server) AutoLogin(ctx context.Context, in *authenticationpb.AutoLoginRequ
 	indexFound := -1
 	matchedDeviceNotMatchedID := false
 	for i, ele := range serverData.Authorization {
-		fmt.Printf("\nserverId: %v ", ele.ID)
-		fmt.Printf("\nserverDeviceId: %v ", ele.DeviceUniqueID)
 		if ele.DeviceUniqueID == in.DeviceUniqueId && ele.ID == userPayload.ID {
 			indexFound = i
 			break
@@ -414,16 +411,12 @@ func (*server) CreateAccount(ctx context.Context, in *authenticationpb.CreateAcc
 
 }
 
-var countNumber int = 0
-var count time.Duration = time.Duration(time.Millisecond * 0)
-
 /////////////////////////////// Email Verification //////////////////////
 func (*server) EmailVerification(ctx context.Context, in *authenticationpb.EmailVerificationRequest) (*authenticationpb.EmailVerificationRespone, error) {
 	//get user data
 	doneCh := make(chan bool)
 	userDataCh := make(chan *emailVerification)
 	filter := bson.M{"user_email": in.GetEmail()}
-	timeStartCh := time.Now()
 	go func() {
 		verifyCode, _ := strconv.Atoi(authentication.SendMail(in.GetEmail()))
 		userDataCh <- &emailVerification{
@@ -455,11 +448,6 @@ func (*server) EmailVerification(ctx context.Context, in *authenticationpb.Email
 		)
 	}
 	<-doneCh
-	defer func() {
-		countNumber++
-		count += time.Since(timeStartCh)
-		fmt.Printf("Duration Num: %v, Time: %v", countNumber, count)
-	}()
 	return &authenticationpb.EmailVerificationRespone{}, nil
 }
 
@@ -605,4 +593,34 @@ func (*server) ForgotPassword(ctx context.Context, in *authenticationpb.ForgotPa
 	// }()
 
 	return &authenticationpb.ForgotPasswordRespone{}, nil
+}
+
+func (*server) ChangePassword(ctx context.Context, in *authenticationpb.ForgotPasswordResquest) (*authenticationpb.ForgotPasswordRespone, error) {
+	//filter := bson.M{"user_email": in.GetEmail()}
+
+	userPayloadCh := make(chan *authentication.Payload)
+	errCh := make(chan error, 4)
+	go func() {
+		token, err := authentication.ReadTokenFromHeader(ctx)
+		errCh <- err
+		userPayload, err2 := tool.VerifyToken(token)
+		errCh <- err2
+		userPayloadCh <- userPayload
+	}()
+
+	go func() {
+		//authentication.HashPassword(in.GetEmail())
+		fmt.Printf("User: %v", <-userPayloadCh)
+	}()
+	if <-errCh != nil {
+		return nil, status.Error(
+			codes.Internal,
+			"w",
+		)
+	}
+
+	select {}
+
+	defer close(errCh)
+	return &authenticationpb.ChangePasswordRespone{}, nil
 }

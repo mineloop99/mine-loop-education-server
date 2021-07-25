@@ -26,7 +26,10 @@ type AuthenticationClient interface {
 	CreateAccount(ctx context.Context, in *CreateAccountRequest, opts ...grpc.CallOption) (*CreateAccountRespone, error)
 	EmailVerification(ctx context.Context, in *EmailVerificationRequest, opts ...grpc.CallOption) (*EmailVerificationRespone, error)
 	EmailVerificationCode(ctx context.Context, in *EmailVerificationCodeRequest, opts ...grpc.CallOption) (*EmailVerificationCodeRespone, error)
+	/// Send request Only ////
 	ForgotPassword(ctx context.Context, in *ForgotPasswordResquest, opts ...grpc.CallOption) (*ForgotPasswordRespone, error)
+	/// Same use with change password ///
+	ChangePassword(ctx context.Context, in *ChangePasswordResquest, opts ...grpc.CallOption) (*ChangePasswordRespone, error)
 }
 
 type authenticationClient struct {
@@ -109,6 +112,15 @@ func (c *authenticationClient) ForgotPassword(ctx context.Context, in *ForgotPas
 	return out, nil
 }
 
+func (c *authenticationClient) ChangePassword(ctx context.Context, in *ChangePasswordResquest, opts ...grpc.CallOption) (*ChangePasswordRespone, error) {
+	out := new(ChangePasswordRespone)
+	err := c.cc.Invoke(ctx, "/authentication.Authentication/ChangePassword", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // AuthenticationServer is the server API for Authentication service.
 // All implementations must embed UnimplementedAuthenticationServer
 // for forward compatibility
@@ -121,7 +133,10 @@ type AuthenticationServer interface {
 	CreateAccount(context.Context, *CreateAccountRequest) (*CreateAccountRespone, error)
 	EmailVerification(context.Context, *EmailVerificationRequest) (*EmailVerificationRespone, error)
 	EmailVerificationCode(context.Context, *EmailVerificationCodeRequest) (*EmailVerificationCodeRespone, error)
+	/// Send request Only ////
 	ForgotPassword(context.Context, *ForgotPasswordResquest) (*ForgotPasswordRespone, error)
+	/// Same use with change password ///
+	ChangePassword(context.Context, *ChangePasswordResquest) (*ChangePasswordRespone, error)
 	mustEmbedUnimplementedAuthenticationServer()
 }
 
@@ -152,6 +167,9 @@ func (UnimplementedAuthenticationServer) EmailVerificationCode(context.Context, 
 }
 func (UnimplementedAuthenticationServer) ForgotPassword(context.Context, *ForgotPasswordResquest) (*ForgotPasswordRespone, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ForgotPassword not implemented")
+}
+func (UnimplementedAuthenticationServer) ChangePassword(context.Context, *ChangePasswordResquest) (*ChangePasswordRespone, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ChangePassword not implemented")
 }
 func (UnimplementedAuthenticationServer) mustEmbedUnimplementedAuthenticationServer() {}
 
@@ -310,6 +328,24 @@ func _Authentication_ForgotPassword_Handler(srv interface{}, ctx context.Context
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Authentication_ChangePassword_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ChangePasswordResquest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AuthenticationServer).ChangePassword(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/authentication.Authentication/ChangePassword",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AuthenticationServer).ChangePassword(ctx, req.(*ChangePasswordResquest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Authentication_ServiceDesc is the grpc.ServiceDesc for Authentication service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -348,6 +384,10 @@ var Authentication_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ForgotPassword",
 			Handler:    _Authentication_ForgotPassword_Handler,
+		},
+		{
+			MethodName: "ChangePassword",
+			Handler:    _Authentication_ChangePassword_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

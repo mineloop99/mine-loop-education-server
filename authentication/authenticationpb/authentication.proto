@@ -21,7 +21,11 @@ service Authentication {
 
     rpc EmailVerificationCode (EmailVerificationCodeRequest) returns (EmailVerificationCodeRespone);
 
+    /// Send request Only ////
     rpc ForgotPassword (ForgotPasswordResquest) returns (ForgotPasswordRespone);
+    
+    /// Same use with change password ///
+    rpc ChangePassword (ChangePasswordResquest) returns (ChangePasswordRespone);
 }
 
 
@@ -90,9 +94,18 @@ message EmailVerificationCodeRespone {
     string token = 2;
 }
 
+
 message ForgotPasswordResquest {
-    string email =1;
+    string email = 1;
 }
 message ForgotPasswordRespone {
-    
+    string token = 1;
+}
+
+
+message ChangePasswordResquest {
+    string email = 1;
+    string password = 2;
+}
+message ChangePasswordRespone {
 }
