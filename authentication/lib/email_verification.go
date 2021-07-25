@@ -4,24 +4,28 @@ import (
 	"bytes"
 	"crypto/rand"
 	"fmt"
+	"io"
 	"log"
-	"math/big"
 	"net/smtp"
-	"strconv"
 	"text/template"
 )
 
-func generateRandomCode() int64 {
-	max := big.NewInt(999999)
-	n, err := rand.Int(rand.Reader, max)
-	if err != nil {
-		log.Fatal(err)
+var table = [...]byte{'1', '2', '3', '4', '5', '6', '7', '8', '9'}
+
+func generateRandomCode(max int) string {
+	b := make([]byte, max)
+	n, err := io.ReadAtLeast(rand.Reader, b, max)
+	if n != max {
+		panic(err)
 	}
-	return n.Int64()
+	for i := 0; i < len(b); i++ {
+		b[i] = table[int(b[i])%len(table)]
+	}
+	return string(b)
 }
 
-func SendMail(email string) int {
-	verificationCode := int(generateRandomCode())
+func SendMail(email string) string {
+	verificationCode := generateRandomCode(6)
 	// Sender data.
 	from := "mineloopeducation@gmail.com"
 	password := "Hungthjkju2"
@@ -49,7 +53,7 @@ func SendMail(email string) int {
 	err := t.Execute(&body, struct {
 		VerificationCode string
 	}{
-		VerificationCode: strconv.Itoa(verificationCode),
+		VerificationCode: verificationCode,
 	})
 	if err != nil {
 		log.Fatalln(err)

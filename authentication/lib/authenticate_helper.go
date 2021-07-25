@@ -41,7 +41,6 @@ func NewPayLoad(userEmail string, duration time.Duration) (*Payload, error) {
 	if err != nil {
 		return nil, err
 	}
-	fmt.Printf("\nNewPayLoad\nid: %v", tokenID)
 	payload := &Payload{
 		ID:          tokenID,
 		UserEmail:   userEmail,
@@ -115,7 +114,7 @@ func HashPassword(password string, salt string) string {
 func ReadTokenFromHeader(ctx context.Context) (string, error) {
 	/// Get Header
 	md, ok := metadata.FromIncomingContext(ctx)
-	if !ok {
+	if !ok || md == nil {
 		return "", status.Error(
 			codes.Internal,
 			"cannot read metadata",

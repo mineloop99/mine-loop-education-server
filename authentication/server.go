@@ -7,6 +7,7 @@ import (
 	"net"
 	"os"
 	"os/signal"
+	"strconv"
 	"time"
 
 	"github.com/wanatabeyuu/mine-loop-education-server/authentication/authenticationpb"
@@ -134,7 +135,7 @@ func (*server) Testing(ctx context.Context, in *authenticationpb.TestingRequest)
 	if readErr != nil {
 		return nil, readErr
 	}
-	payload, verifyErr := tool.VerifyToken(token)
+	_, verifyErr := tool.VerifyToken(token)
 	if verifyErr != nil {
 		return nil, status.Errorf(
 			codes.Internal,
@@ -142,14 +143,14 @@ func (*server) Testing(ctx context.Context, in *authenticationpb.TestingRequest)
 		)
 	}
 
-	fmt.Printf("\nUserEmail: %v \nId: %v \nExpiryDate: %v", payload.UserEmail, payload.ID, payload.ExpiredDate)
-
 	return &authenticationpb.TestingRespone{}, nil
 }
 
+/////////////////////////////// LOGIN //////////////////////
 func (*server) Login(ctx context.Context, in *authenticationpb.LoginRequest) (*authenticationpb.LoginRespone, error) {
 	println("Login revoke")
 	loginInfo := in.GetAccountInformation()
+	deviceId := in.GetDeviceUniqueId()
 
 	/// get user server
 	userData := userInfo{
@@ -164,49 +165,79 @@ func (*server) Login(ctx context.Context, in *authenticationpb.LoginRequest) (*a
 	if err := result.Decode(serverData); err != nil {
 		return nil, status.Error(
 			codes.NotFound,
-			"Cannot find user with specified email!",
+			"EMAIL_OR_PASSWORD_INCORRECT",
 		)
 	}
 
-	///Check password
+	//Check password
 	if serverData.Password != userData.Password {
 		return nil, status.Error(
 			codes.Internal,
-			"Wrong email or password!",
+			"EMAIL_OR_PASSWORD_INCORRECT",
+		)
+	}
+	//Check activated and return
+	if !serverData.IsActivated {
+		return nil, status.Error(
+			codes.Unauthenticated,
+			"NEED_VERIFY",
 		)
 	}
 
-	//Generate new Token
-	expiryTime := time.Now().Add(time.Duration(time.Hour * 24 * 30))
-	token, generateErr := tool.GenerateToken(serverData.UserEmail, _expiryDate)
+	///Find if exist device to set
+	indexFound := -1
+	for i, ele := range serverData.Authorization {
+		if ele.DeviceUniqueID == in.DeviceUniqueId {
+			indexFound = i
+			break
+		}
+	}
+	var timeExpiriedDate int64
+	var newToken string
+	/// Calculate new Token's Date Epoch
+	timeExpiriedDate = time.Now().Add(time.Duration(time.Hour * 24 * 30)).Unix()
+	//Generate new token
+	_newToken, generateErr := tool.GenerateToken(userData.UserEmail, _expiryDate)
 	if generateErr != nil {
 		return nil, generateErr
 	}
+	newToken = _newToken
+	//Verify to get ID
+	newPayload, verifyErr := tool.VerifyToken(newToken)
+	if verifyErr != nil {
+		return nil, verifyErr
+	}
 
-	/// Store Token identifier
-	updateFilter := bson.M{"user_email": userData.UserEmail}
-	updateResult, updateErr := authenticationCollection.UpdateOne(context.Background(), updateFilter, bson.D{{"$set", bson.M{"is_activated": true}}})
-	if updateErr != nil {
-		return nil, status.Errorf(
-			codes.NotFound,
-			fmt.Sprintf("Cannot find your email in database: %v", updateErr),
-		)
+	var authorizationString string
+	///If not found existing Device. Create one(Index = max)
+	///If found existing Device (Index = i)
+	if indexFound == -1 {
+		authorizationString = fmt.Sprintf("authorization.%d", len(serverData.Authorization))
+	} else {
+		///Store new token's identity To database
+		authorizationString = fmt.Sprintf("authorization.%d", indexFound)
 	}
-	if updateResult.MatchedCount == 0 {
-		return nil, status.Errorf(
-			codes.NotFound,
-			fmt.Sprintf("Cannot activate your email: %v", updateErr),
-		)
+	authorizationPayload := &authorization{
+		ID:             newPayload.ID,
+		DeviceUniqueID: deviceId,
 	}
+
+	///Store new Token's Identity
+	_, storeErr := authenticationCollection.UpdateOne(context.Background(), filter,
+		bson.D{primitive.E{Key: "$set", Value: bson.M{authorizationString: authorizationPayload}}})
+	if storeErr != nil {
+		return nil, storeErr
+	}
+
 	return &authenticationpb.LoginRespone{
-		Token:             token,
-		ExpiryTimeSeconds: int32(expiryTime.Unix() - time.Now().Unix()),
+		Token:             newToken,
+		ExpiryTimeSeconds: int32(timeExpiriedDate),
 	}, nil
 }
 
-///////////////////////////////
+/////////////////////////////// AUTO LOGIN //////////////////////
 func (*server) AutoLogin(ctx context.Context, in *authenticationpb.AutoLoginRequest) (*authenticationpb.AutoLoginRespone, error) {
-	println("AutoLogin Revoke:\n")
+	println("\nAutoLogin Revoke:\n")
 
 	//Read Token From Request Header
 	oldToken, readErr := authentication.ReadTokenFromHeader(ctx)
@@ -223,6 +254,7 @@ func (*server) AutoLogin(ctx context.Context, in *authenticationpb.AutoLoginRequ
 		)
 	}
 
+	//Get Server Data matched with user
 	serverData := &userInfo{}
 	filter := bson.M{"user_email": userPayload.UserEmail}
 	result := authenticationCollection.FindOne(context.Background(), filter)
@@ -233,47 +265,112 @@ func (*server) AutoLogin(ctx context.Context, in *authenticationpb.AutoLoginRequ
 		)
 	}
 
-	//Generate new token
-	newToken, generateErr := tool.GenerateToken(serverData.UserEmail, _expiryDate)
-	if generateErr != nil {
-		return nil, generateErr
-	}
-
-	//authorization generate
-	authorizationPayload := &authorization{
-		ID:             userPayload.ID,
-		DeviceUniqueID: in.GetDeviceUniqueId(),
-	}
-	//Compare With Server Data
-	var indexFound int
+	//Compare With Server Data and get Index if Found
+	indexFound := -1
+	matchedDeviceNotMatchedID := false
 	for i, ele := range serverData.Authorization {
-		if ele.ID == userPayload.ID {
+		fmt.Printf("\nserverId: %v ", ele.ID)
+		fmt.Printf("\nserverDeviceId: %v ", ele.DeviceUniqueID)
+		if ele.DeviceUniqueID == in.DeviceUniqueId && ele.ID == userPayload.ID {
 			indexFound = i
 			break
 		}
-		indexFound = -1
-	}
-	//Create if not found any Id matched index = -1, update if found one
-	if indexFound == -1 {
-
-	} else {
-		/// Update and store identify
-		_, storeErr := authenticationCollection.UpdateOne(context.Background(), filter,
-			bson.D{{"$set", bson.M{fmt.Sprintf("authorization.%d", indexFound): bson.A{authorizationPayload}}}})
-		if storeErr != nil {
-			return nil, storeErr
+		if ele.DeviceUniqueID == in.DeviceUniqueId {
+			matchedDeviceNotMatchedID = true
+			indexFound = i
+			break
 		}
 	}
 
-	timeExpiriedDate := time.Now().Add(time.Duration(time.Hour * 24 * 30)).Unix()
+	//authorization generate
+	var timeExpiriedDate int64
+	var newToken string
+	//not authorize not found any Id matched index = -1, update if found one, remove if device exist
+	if indexFound == -1 {
+		return nil, status.Error(
+			codes.NotFound,
+			"Session_Ended",
+		)
+	} else if matchedDeviceNotMatchedID {
+		fmt.Print("1")
+		_, storeErr := authenticationCollection.UpdateOne(context.Background(), filter, bson.D{primitive.E{Key: "$pull",
+			Value: bson.M{
+				"authorization": bson.M{"device_unique_id": in.GetDeviceUniqueId()}}}})
+		if storeErr != nil {
+			return nil, storeErr
+		}
+	} else {
+		/// Update and store identify
+		timeExpiriedDate = time.Now().Add(time.Duration(time.Hour * 24 * 30)).Unix()
+		//Generate new token
+		_newToken, generateErr := tool.GenerateToken(userPayload.UserEmail, _expiryDate)
+		if generateErr != nil {
+			return nil, generateErr
+		}
+
+		newToken = _newToken
+		//Verify to get ID
+		newPayload, verifyErr2 := tool.VerifyToken(newToken)
+		if verifyErr2 != nil {
+			return nil, verifyErr2
+		}
+		fmt.Printf("\n0, %v", indexFound)
+		authorizationString := fmt.Sprintf("authorization.%d", indexFound)
+		authorizationPayload := &authorization{
+			ID:             newPayload.ID,
+			DeviceUniqueID: in.GetDeviceUniqueId(),
+		}
+		_, storeErr := authenticationCollection.UpdateOne(context.Background(), filter,
+			bson.D{primitive.E{Key: "$set", Value: bson.M{authorizationString: authorizationPayload}}})
+		if storeErr != nil {
+			return nil, storeErr
+		}
+
+		//Store new token's identity
+	}
 
 	//newToken, generateErr = tool.GenerateToken()
 	return &authenticationpb.AutoLoginRespone{
-		Token:             newToken,
-		ExpiryTimeSeconds: int32(timeExpiriedDate),
-	}, nil
+			Token:             newToken,
+			ExpiryTimeSeconds: int32(timeExpiriedDate),
+		}, status.Error(
+			codes.OK,
+			"OK",
+		)
 }
 
+/////////////////////////////// LOGOUT //////////////////////
+func (*server) Logout(ctx context.Context, in *authenticationpb.LogoutRequest) (*authenticationpb.LougoutRespone, error) {
+	deviceUniqueId := in.GetDeviceUniqueId()
+	userToken, readErr := authentication.ReadTokenFromHeader(ctx)
+	if readErr != nil {
+		return nil, status.Error(
+			codes.NotFound,
+			"Token Not Found",
+		)
+	}
+	fmt.Printf("token: %v", userToken)
+	userPayload, verifyErr := tool.VerifyToken(userToken)
+	if verifyErr != nil {
+		return nil, status.Error(
+			codes.Internal,
+			"Can't authorize",
+		)
+	}
+
+	filter := bson.M{"user_email": userPayload.UserEmail}
+	updateInterface := bson.D{primitive.E{Key: "$pull", Value: bson.M{"authorization": bson.M{"device_unique_id": deviceUniqueId}}}}
+	result, updateErr := authenticationCollection.UpdateOne(context.Background(), filter, updateInterface)
+	if updateErr != nil {
+		fmt.Printf("Pull not executed: %v", updateErr)
+		return nil, updateErr
+	}
+	fmt.Printf("RES: %v", result.MatchedCount)
+
+	return &authenticationpb.LougoutRespone{}, nil
+}
+
+/////////////////////////////// REGISTER //////////////////////
 func (*server) CreateAccount(ctx context.Context, in *authenticationpb.CreateAccountRequest) (*authenticationpb.CreateAccountRespone, error) {
 
 	createAccountInfo := in.GetAccountInformation()
@@ -317,45 +414,63 @@ func (*server) CreateAccount(ctx context.Context, in *authenticationpb.CreateAcc
 
 }
 
+var countNumber int = 0
+var count time.Duration = time.Duration(time.Millisecond * 0)
+
+/////////////////////////////// Email Verification //////////////////////
 func (*server) EmailVerification(ctx context.Context, in *authenticationpb.EmailVerificationRequest) (*authenticationpb.EmailVerificationRespone, error) {
 	//get user data
-	userData := &emailVerification{
-		UserEmail:            in.GetEmail(),
-		VerifyCode:           authentication.SendMail(in.GetEmail()),
-		DateExpiredCodeEpoch: int(time.Now().Add(time.Minute * 10).Unix()),
-	}
-
-	/// Find and replace if exist
+	doneCh := make(chan bool)
+	userDataCh := make(chan *emailVerification)
 	filter := bson.M{"user_email": in.GetEmail()}
-	findRes := emailVerificationCollection.FindOne(context.Background(), filter)
-	if findRes.Err() == nil {
-		_, err2 := emailVerificationCollection.ReplaceOne(context.Background(), filter, userData)
-		if err2 != nil {
-			return nil, status.Errorf(
-				codes.InvalidArgument,
-				fmt.Sprintf("Wrong Argument: %v", err2),
-			)
+	timeStartCh := time.Now()
+	go func() {
+		verifyCode, _ := strconv.Atoi(authentication.SendMail(in.GetEmail()))
+		userDataCh <- &emailVerification{
+			UserEmail:            in.GetEmail(),
+			VerifyCode:           verifyCode,
+			DateExpiredCodeEpoch: int(time.Now().Add(time.Minute * 10).Unix()),
 		}
-	} else {
-		_, err := emailVerificationCollection.InsertOne(context.Background(), userData)
-		if err != nil {
-			return nil, status.Errorf(
-				codes.Internal,
-				fmt.Sprintf("Cannot do Internal: %v", err),
-			)
-		} else {
-			fmt.Println("\nInsert succeed!")
-		}
-	}
+	}()
 
+	updateUserDataErrCh := make(chan error)
+
+	go func() {
+		findRes := emailVerificationCollection.FindOne(context.Background(), filter)
+		if findRes.Err() == nil {
+			_, err := emailVerificationCollection.ReplaceOne(context.Background(), filter, <-userDataCh)
+			updateUserDataErrCh <- err
+		} else {
+			_, err := emailVerificationCollection.InsertOne(context.Background(), <-userDataCh)
+			updateUserDataErrCh <- err
+		}
+		doneCh <- true
+	}()
+	/// Find and replace if exist
+	var err error = <-updateUserDataErrCh
+	if err != nil {
+		return nil, status.Errorf(
+			codes.InvalidArgument,
+			fmt.Sprintf("Wrong Argument: %v", err),
+		)
+	}
+	<-doneCh
+	defer func() {
+		countNumber++
+		count += time.Since(timeStartCh)
+		fmt.Printf("Duration Num: %v, Time: %v", countNumber, count)
+	}()
 	return &authenticationpb.EmailVerificationRespone{}, nil
 }
 
+/////////////////////////////// Email Code Verification //////////////////////
 func (*server) EmailVerificationCode(ctx context.Context, in *authenticationpb.EmailVerificationCodeRequest) (*authenticationpb.EmailVerificationCodeRespone, error) {
+	/// Temp variable for false return
 	returnFalse := &authenticationpb.EmailVerificationCodeRespone{
 		VerifyStatus: true,
+		Token:        "",
 	}
-
+	deviceId := in.GetDeviceUniqueId()
 	/// get user server
 	userData := emailVerification{
 		UserEmail:  in.GetEmail(),
@@ -364,8 +479,8 @@ func (*server) EmailVerificationCode(ctx context.Context, in *authenticationpb.E
 
 	///Get data server
 	serverData := &emailVerification{}
-	findFilter := bson.M{"user_email": userData.UserEmail}
-	findResult := emailVerificationCollection.FindOne(context.Background(), findFilter)
+	filter := bson.M{"user_email": userData.UserEmail}
+	findResult := emailVerificationCollection.FindOne(context.Background(), filter)
 	if err := findResult.Decode(serverData); err != nil {
 		return nil, status.Error(
 			codes.NotFound,
@@ -392,10 +507,9 @@ func (*server) EmailVerificationCode(ctx context.Context, in *authenticationpb.E
 			fmt.Sprintf("Cannot find blog in MongoDb: %v", deleteErr),
 		)
 	}
-
 	/// Update if true
 	updateFilter := bson.M{"user_email": userData.UserEmail}
-	updateResult, updateErr := authenticationCollection.UpdateOne(context.Background(), updateFilter, bson.D{{"$set", bson.M{"is_activated": true}}})
+	updateResult, updateErr := authenticationCollection.UpdateOne(context.Background(), updateFilter, bson.D{primitive.E{Key: "$set", Value: bson.M{"is_activated": true}}})
 	if updateErr != nil {
 		return returnFalse, status.Errorf(
 			codes.NotFound,
@@ -408,9 +522,87 @@ func (*server) EmailVerificationCode(ctx context.Context, in *authenticationpb.E
 			fmt.Sprintf("Cannot activate your email: %v", updateErr),
 		)
 	}
+	//Generate new token
+	newToken, generateErr := tool.GenerateToken(userData.UserEmail, _expiryDate)
+	if generateErr != nil {
+		return nil, generateErr
+	}
+	//Verify to get ID
+	newPayload, verifyErr := tool.VerifyToken(newToken)
+	if verifyErr != nil {
+		return nil, verifyErr
+	}
+
+	///Store new Token's Identity
+	authorizationPayload := &authorization{
+		ID:             newPayload.ID,
+		DeviceUniqueID: deviceId,
+	}
+	_, storeErr := authenticationCollection.UpdateOne(context.Background(), filter,
+		bson.D{primitive.E{Key: "$set", Value: bson.M{"authorization": bson.A{authorizationPayload}}}})
+	if storeErr != nil {
+		return nil, storeErr
+	}
 
 	//// Return true for user
 	return &authenticationpb.EmailVerificationCodeRespone{
 		VerifyStatus: true,
+		Token:        newToken,
 	}, nil
+}
+
+//////////////////////////////////// Forgot Password ////////////////
+func (*server) ForgotPassword(ctx context.Context, in *authenticationpb.ForgotPasswordResquest) (*authenticationpb.ForgotPasswordRespone, error) {
+
+	//timeStartCh := time.Now()
+	filter := bson.M{"user_email": in.GetEmail()}
+
+	serverData := &userInfo{}
+	result := authenticationCollection.FindOne(context.Background(), filter)
+	if err := result.Decode(serverData); err != nil {
+		return nil, status.Error(
+			codes.NotFound,
+			"EMAIL_NOT_EXIST",
+		)
+	}
+
+	doneCh := make(chan bool)
+	updateUserDataErrCh := make(chan error)
+	userDataCh := make(chan *emailVerification)
+	go func() {
+		verifyCode, _ := strconv.Atoi(authentication.SendMail(in.GetEmail()))
+		userDataCh <- &emailVerification{
+			UserEmail:            in.GetEmail(),
+			VerifyCode:           verifyCode,
+			DateExpiredCodeEpoch: int(time.Now().Add(time.Minute * 10).Unix()),
+		}
+	}()
+
+	go func() {
+		findRes := emailVerificationCollection.FindOne(context.Background(), filter)
+		if findRes.Err() == nil {
+			_, err := emailVerificationCollection.ReplaceOne(context.Background(), filter, <-userDataCh)
+			updateUserDataErrCh <- err
+		} else {
+			_, err := emailVerificationCollection.InsertOne(context.Background(), <-userDataCh)
+			updateUserDataErrCh <- err
+		}
+		doneCh <- true
+	}()
+	/// Find and replace if exist
+	var err error = <-updateUserDataErrCh
+	if err != nil {
+		return nil, status.Errorf(
+			codes.InvalidArgument,
+			fmt.Sprintf("Wrong Argument: %v", err),
+		)
+	}
+	<-doneCh
+	// defer func() {
+	// 	countNumber++
+	// 	count += time.Since(timeStartCh)
+	// 	fmt.Printf("Duration Num: %v, Time: %v", countNumber, count)
+	// }()
+
+	return &authenticationpb.ForgotPasswordRespone{}, nil
 }

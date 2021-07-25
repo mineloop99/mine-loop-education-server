@@ -22,9 +22,11 @@ type AuthenticationClient interface {
 	Testing(ctx context.Context, in *TestingRequest, opts ...grpc.CallOption) (*TestingRespone, error)
 	Login(ctx context.Context, in *LoginRequest, opts ...grpc.CallOption) (*LoginRespone, error)
 	AutoLogin(ctx context.Context, in *AutoLoginRequest, opts ...grpc.CallOption) (*AutoLoginRespone, error)
+	Logout(ctx context.Context, in *LogoutRequest, opts ...grpc.CallOption) (*LougoutRespone, error)
 	CreateAccount(ctx context.Context, in *CreateAccountRequest, opts ...grpc.CallOption) (*CreateAccountRespone, error)
 	EmailVerification(ctx context.Context, in *EmailVerificationRequest, opts ...grpc.CallOption) (*EmailVerificationRespone, error)
 	EmailVerificationCode(ctx context.Context, in *EmailVerificationCodeRequest, opts ...grpc.CallOption) (*EmailVerificationCodeRespone, error)
+	ForgotPassword(ctx context.Context, in *ForgotPasswordResquest, opts ...grpc.CallOption) (*ForgotPasswordRespone, error)
 }
 
 type authenticationClient struct {
@@ -62,6 +64,15 @@ func (c *authenticationClient) AutoLogin(ctx context.Context, in *AutoLoginReque
 	return out, nil
 }
 
+func (c *authenticationClient) Logout(ctx context.Context, in *LogoutRequest, opts ...grpc.CallOption) (*LougoutRespone, error) {
+	out := new(LougoutRespone)
+	err := c.cc.Invoke(ctx, "/authentication.Authentication/Logout", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *authenticationClient) CreateAccount(ctx context.Context, in *CreateAccountRequest, opts ...grpc.CallOption) (*CreateAccountRespone, error) {
 	out := new(CreateAccountRespone)
 	err := c.cc.Invoke(ctx, "/authentication.Authentication/CreateAccount", in, out, opts...)
@@ -89,6 +100,15 @@ func (c *authenticationClient) EmailVerificationCode(ctx context.Context, in *Em
 	return out, nil
 }
 
+func (c *authenticationClient) ForgotPassword(ctx context.Context, in *ForgotPasswordResquest, opts ...grpc.CallOption) (*ForgotPasswordRespone, error) {
+	out := new(ForgotPasswordRespone)
+	err := c.cc.Invoke(ctx, "/authentication.Authentication/ForgotPassword", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // AuthenticationServer is the server API for Authentication service.
 // All implementations must embed UnimplementedAuthenticationServer
 // for forward compatibility
@@ -97,9 +117,11 @@ type AuthenticationServer interface {
 	Testing(context.Context, *TestingRequest) (*TestingRespone, error)
 	Login(context.Context, *LoginRequest) (*LoginRespone, error)
 	AutoLogin(context.Context, *AutoLoginRequest) (*AutoLoginRespone, error)
+	Logout(context.Context, *LogoutRequest) (*LougoutRespone, error)
 	CreateAccount(context.Context, *CreateAccountRequest) (*CreateAccountRespone, error)
 	EmailVerification(context.Context, *EmailVerificationRequest) (*EmailVerificationRespone, error)
 	EmailVerificationCode(context.Context, *EmailVerificationCodeRequest) (*EmailVerificationCodeRespone, error)
+	ForgotPassword(context.Context, *ForgotPasswordResquest) (*ForgotPasswordRespone, error)
 	mustEmbedUnimplementedAuthenticationServer()
 }
 
@@ -116,6 +138,9 @@ func (UnimplementedAuthenticationServer) Login(context.Context, *LoginRequest) (
 func (UnimplementedAuthenticationServer) AutoLogin(context.Context, *AutoLoginRequest) (*AutoLoginRespone, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method AutoLogin not implemented")
 }
+func (UnimplementedAuthenticationServer) Logout(context.Context, *LogoutRequest) (*LougoutRespone, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Logout not implemented")
+}
 func (UnimplementedAuthenticationServer) CreateAccount(context.Context, *CreateAccountRequest) (*CreateAccountRespone, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CreateAccount not implemented")
 }
@@ -124,6 +149,9 @@ func (UnimplementedAuthenticationServer) EmailVerification(context.Context, *Ema
 }
 func (UnimplementedAuthenticationServer) EmailVerificationCode(context.Context, *EmailVerificationCodeRequest) (*EmailVerificationCodeRespone, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method EmailVerificationCode not implemented")
+}
+func (UnimplementedAuthenticationServer) ForgotPassword(context.Context, *ForgotPasswordResquest) (*ForgotPasswordRespone, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ForgotPassword not implemented")
 }
 func (UnimplementedAuthenticationServer) mustEmbedUnimplementedAuthenticationServer() {}
 
@@ -192,6 +220,24 @@ func _Authentication_AutoLogin_Handler(srv interface{}, ctx context.Context, dec
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Authentication_Logout_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(LogoutRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AuthenticationServer).Logout(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/authentication.Authentication/Logout",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AuthenticationServer).Logout(ctx, req.(*LogoutRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _Authentication_CreateAccount_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(CreateAccountRequest)
 	if err := dec(in); err != nil {
@@ -246,6 +292,24 @@ func _Authentication_EmailVerificationCode_Handler(srv interface{}, ctx context.
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Authentication_ForgotPassword_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ForgotPasswordResquest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AuthenticationServer).ForgotPassword(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/authentication.Authentication/ForgotPassword",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AuthenticationServer).ForgotPassword(ctx, req.(*ForgotPasswordResquest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Authentication_ServiceDesc is the grpc.ServiceDesc for Authentication service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -266,6 +330,10 @@ var Authentication_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _Authentication_AutoLogin_Handler,
 		},
 		{
+			MethodName: "Logout",
+			Handler:    _Authentication_Logout_Handler,
+		},
+		{
 			MethodName: "CreateAccount",
 			Handler:    _Authentication_CreateAccount_Handler,
 		},
@@ -276,6 +344,10 @@ var Authentication_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "EmailVerificationCode",
 			Handler:    _Authentication_EmailVerificationCode_Handler,
+		},
+		{
+			MethodName: "ForgotPassword",
+			Handler:    _Authentication_ForgotPassword_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
