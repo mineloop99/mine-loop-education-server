@@ -555,38 +555,37 @@ func (*server) ForgotPassword(ctx context.Context, in *authenticationpb.ForgotPa
 		)
 	}
 
-	doneCh := make(chan bool)
-	updateUserDataErrCh := make(chan error)
+	errCh := make(chan error, 4)
 	userDataCh := make(chan *emailVerification)
 	go func() {
-		verifyCode, _ := strconv.Atoi(authentication.SendMail(in.GetEmail()))
+		verifyCode, err := strconv.Atoi(authentication.SendMail(in.GetEmail()))
 		userDataCh <- &emailVerification{
 			UserEmail:            in.GetEmail(),
 			VerifyCode:           verifyCode,
 			DateExpiredCodeEpoch: int(time.Now().Add(time.Minute * 10).Unix()),
 		}
+		errCh <- err
 	}()
 
 	go func() {
 		findRes := emailVerificationCollection.FindOne(context.Background(), filter)
 		if findRes.Err() == nil {
 			_, err := emailVerificationCollection.ReplaceOne(context.Background(), filter, <-userDataCh)
-			updateUserDataErrCh <- err
+			errCh <- err
 		} else {
 			_, err := emailVerificationCollection.InsertOne(context.Background(), <-userDataCh)
-			updateUserDataErrCh <- err
+			errCh <- err
 		}
-		doneCh <- true
 	}()
 	/// Find and replace if exist
-	var err error = <-updateUserDataErrCh
+	err := <-errCh
 	if err != nil {
 		return nil, status.Errorf(
 			codes.InvalidArgument,
 			fmt.Sprintf("Wrong Argument: %v", err),
 		)
 	}
-	<-doneCh
+	defer close(errCh)
 	// defer func() {
 	// 	countNumber++
 	// 	count += time.Since(timeStartCh)
