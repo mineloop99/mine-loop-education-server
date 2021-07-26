@@ -415,40 +415,38 @@ func (*server) CreateAccount(ctx context.Context, in *authenticationpb.CreateAcc
 /////////////////////////////// Email Verification //////////////////////
 func (*server) EmailVerification(ctx context.Context, in *authenticationpb.EmailVerificationRequest) (*authenticationpb.EmailVerificationRespone, error) {
 	//get user data
-	doneCh := make(chan bool)
 	userDataCh := make(chan *emailVerification)
+
+	errCh := make(chan error)
 	filter := bson.M{"user_email": in.GetEmail()}
 	go func() {
-		verifyCode, _ := strconv.Atoi(authentication.SendMail(in.GetEmail()))
+		verifyCode, err := strconv.Atoi(authentication.SendMail(in.GetEmail()))
 		userDataCh <- &emailVerification{
 			UserEmail:            in.GetEmail(),
 			VerifyCode:           verifyCode,
 			DateExpiredCodeEpoch: int(time.Now().Add(time.Minute * 10).Unix()),
 		}
+		errCh <- err
 	}()
-
-	updateUserDataErrCh := make(chan error)
 
 	go func() {
 		findRes := emailVerificationCollection.FindOne(context.Background(), filter)
 		if findRes.Err() == nil {
 			_, err := emailVerificationCollection.ReplaceOne(context.Background(), filter, <-userDataCh)
-			updateUserDataErrCh <- err
+			errCh <- err
 		} else {
 			_, err := emailVerificationCollection.InsertOne(context.Background(), <-userDataCh)
-			updateUserDataErrCh <- err
+			errCh <- err
 		}
-		doneCh <- true
 	}()
 	/// Find and replace if exist
-	var err error = <-updateUserDataErrCh
+	var err error = <-errCh
 	if err != nil {
 		return nil, status.Errorf(
 			codes.InvalidArgument,
 			fmt.Sprintf("Wrong Argument: %v", err),
 		)
 	}
-	<-doneCh
 	return &authenticationpb.EmailVerificationRespone{}, nil
 }
 
@@ -555,7 +553,7 @@ func (*server) ForgotPassword(ctx context.Context, in *authenticationpb.ForgotPa
 		)
 	}
 
-	errCh := make(chan error, 4)
+	errCh := make(chan error)
 	userDataCh := make(chan *emailVerification)
 	go func() {
 		verifyCode, err := strconv.Atoi(authentication.SendMail(in.GetEmail()))
