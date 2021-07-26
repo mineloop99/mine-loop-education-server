@@ -381,6 +381,7 @@ func (*server) CreateAccount(ctx context.Context, in *authenticationpb.CreateAcc
 		IsActivated: false,
 		DateCreated: time.Now(),
 	}
+	fmt.Printf("RES: %v", createAccountInfo.Password)
 	/// find user email exist or not
 	filter := bson.M{"user_email": userData.UserEmail}
 	result := authenticationCollection.FindOne(context.Background(), filter)
@@ -595,32 +596,33 @@ func (*server) ForgotPassword(ctx context.Context, in *authenticationpb.ForgotPa
 	return &authenticationpb.ForgotPasswordRespone{}, nil
 }
 
-func (*server) ChangePassword(ctx context.Context, in *authenticationpb.ForgotPasswordResquest) (*authenticationpb.ForgotPasswordRespone, error) {
-	//filter := bson.M{"user_email": in.GetEmail()}
+func (*server) ChangePassword(ctx context.Context, in *authenticationpb.ChangePasswordResquest) (*authenticationpb.ChangePasswordRespone, error) {
 
 	userPayloadCh := make(chan *authentication.Payload)
-	errCh := make(chan error, 4)
+	userPassword := in.GetPassword()
+	fmt.Printf("Password: %v", userPassword)
+	errCh := make(chan error)
 	go func() {
 		token, err := authentication.ReadTokenFromHeader(ctx)
 		errCh <- err
 		userPayload, err2 := tool.VerifyToken(token)
-		errCh <- err2
 		userPayloadCh <- userPayload
+		errCh <- err2
 	}()
 
 	go func() {
-		//authentication.HashPassword(in.GetEmail())
-		fmt.Printf("User: %v", <-userPayloadCh)
+		userPayload := <-userPayloadCh
+		filter := bson.M{"user_email": userPayload.UserEmail}
+		updateFilter := bson.D{primitive.E{Key: "$set", Value: bson.M{"password": authentication.HashPassword(userPassword, userPayload.UserEmail)}}}
+
+		result := authenticationCollection.FindOneAndUpdate(context.Background(), filter, updateFilter)
+		errCh <- result.Err()
 	}()
-	if <-errCh != nil {
-		return nil, status.Error(
-			codes.Internal,
-			"w",
-		)
+
+	message := <-errCh
+	if message != nil {
+		return nil, message
 	}
 
-	select {}
-
-	defer close(errCh)
 	return &authenticationpb.ChangePasswordRespone{}, nil
 }
