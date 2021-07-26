@@ -623,6 +623,6 @@ func (*server) ChangePassword(ctx context.Context, in *authenticationpb.ChangePa
 	if message != nil {
 		return nil, message
 	}
-
+	defer close(errCh)
 	return &authenticationpb.ChangePasswordRespone{}, nil
 }
