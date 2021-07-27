@@ -581,7 +581,6 @@ func (*server) ForgotPassword(ctx context.Context, in *authenticationpb.ForgotPa
 			fmt.Sprintf("Wrong Argument: %v", err),
 		)
 	}
-	defer close(errCh)
 	return &authenticationpb.ForgotPasswordRespone{}, nil
 }
 
@@ -611,6 +610,5 @@ func (*server) ChangePassword(ctx context.Context, in *authenticationpb.ChangePa
 	if message != nil {
 		return nil, message
 	}
-	defer close(errCh)
 	return &authenticationpb.ChangePasswordRespone{}, nil
 }
