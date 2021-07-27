@@ -544,7 +544,7 @@ func (*server) ForgotPassword(ctx context.Context, in *authenticationpb.ForgotPa
 
 	serverData := &userInfo{}
 	result := authenticationCollection.FindOne(context.Background(), filter)
-	if err := result.Decode(serverData); err != nil {
+	if err1 := result.Decode(serverData); err1 != nil {
 		return nil, status.Error(
 			codes.NotFound,
 			"EMAIL_NOT_EXIST",
