@@ -7,6 +7,7 @@ import (
 	"io"
 	"log"
 	"net/smtp"
+	"os"
 	"text/template"
 )
 
@@ -25,6 +26,11 @@ func generateRandomCode(max int) string {
 }
 
 func SendMail(email string) string {
+	path, err1 := os.Getwd()
+	if err1 != nil {
+		log.Println(err1)
+	}
+	fmt.Println(path)
 	verificationCode := generateRandomCode(6)
 	// Sender data.
 	from := "mineloopeducation@gmail.com"
@@ -43,7 +49,7 @@ func SendMail(email string) string {
 	//Authentication
 	auth := smtp.PlainAuth("", from, password, smtpHost)
 
-	t, _ := template.ParseFiles("lib/email-verification-template.html")
+	t, _ := template.ParseFiles("email-verification-template.html")
 
 	var body bytes.Buffer
 
