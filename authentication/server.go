@@ -630,10 +630,6 @@ func (*server) Authorization(ctx context.Context, in *authenticationpb.Authoriza
 		errCh <- result.Err()
 	}()
 
-	if in.GetUserEmail() != userPayload.UserEmail {
-		return falseReturn, nil
-	}
-
 	if <-errCh != nil {
 		return falseReturn, nil
 	}
