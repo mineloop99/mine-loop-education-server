@@ -17,8 +17,6 @@ func ConnectServerAPI() authenticationpb.AuthenticationServicesClient {
 	if err != nil {
 		log.Fatalf("Could not connect: %v - Error: %v", authenticationConnectionString, err)
 	}
-
-	defer cc.Close()
 	return authenticationpb.NewAuthenticationServicesClient(cc)
 }
 

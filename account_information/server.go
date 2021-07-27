@@ -27,13 +27,14 @@ var c authenticationpb.AuthenticationServicesClient
 
 const mongoConnectionString = "mongodb+srv://mineloop99:hungthjkju2@mineloop-education-serv.ys7hr.mongodb.net/test"
 
-type server struct {
+type accountInformationServer struct {
 	account_informationpb.UnimplementedAccountInformationServiceServer
 }
 
 func main() {
 	const databaseName string = "testdb"
 	var s *grpc.Server
+	var opts []grpc.ServerOption
 	//* TLS Region*//
 	// tls := false
 	// var opts []grpc.ServerOption
@@ -51,6 +52,7 @@ func main() {
 	// } else {
 	// 	s = grpc.NewServer(opts...)
 	// }
+	s = grpc.NewServer(opts...)
 	lis, err := net.Listen("tcp", accountInformationPort)
 	if err != nil {
 		log.Fatalf("failed to serve: %v", err)
@@ -69,7 +71,7 @@ func main() {
 	authenticationCollection = client.Database(databaseName).Collection("authentication")
 	accountInformationCollection = client.Database(databaseName).Collection("account_information")
 	// Register Server
-	account_informationpb.RegisterAccountInformationServiceServer(s, &server{})
+	account_informationpb.RegisterAccountInformationServiceServer(s, &accountInformationServer{})
 	go func() {
 		if err := s.Serve(lis); err != nil {
 			log.Fatalf("failed to serve: %v", err)
@@ -92,7 +94,7 @@ func main() {
 	fmt.Println("End of Program")
 }
 
-func (*server) WelcomeMessage(ctx context.Context, in *account_informationpb.WelcomeMessageRequest) (*account_informationpb.WelcomeMessageRespone, error) {
+func (*accountInformationServer) WelcomeMessage(ctx context.Context, in *account_informationpb.WelcomeMessageRequest) (*account_informationpb.WelcomeMessageRespone, error) {
 	token, err := authentication.ReadTokenFromHeader(ctx)
 	if err != nil {
 		return nil, err
