@@ -289,7 +289,6 @@ func (*server) AutoLogin(ctx context.Context, in *authenticationpb.AutoLoginRequ
 			"Session_Ended",
 		)
 	} else if matchedDeviceNotMatchedID {
-		fmt.Print("1")
 		_, storeErr := authenticationCollection.UpdateOne(context.Background(), filter, bson.D{primitive.E{Key: "$pull",
 			Value: bson.M{
 				"authorization": bson.M{"device_unique_id": in.GetDeviceUniqueId()}}}})
@@ -311,7 +310,6 @@ func (*server) AutoLogin(ctx context.Context, in *authenticationpb.AutoLoginRequ
 		if verifyErr2 != nil {
 			return nil, verifyErr2
 		}
-		fmt.Printf("\n0, %v", indexFound)
 		authorizationString := fmt.Sprintf("authorization.%d", indexFound)
 		authorizationPayload := &authorization{
 			ID:             newPayload.ID,
@@ -346,7 +344,6 @@ func (*server) Logout(ctx context.Context, in *authenticationpb.LogoutRequest) (
 			"Token Not Found",
 		)
 	}
-	fmt.Printf("token: %v", userToken)
 	userPayload, verifyErr := tool.VerifyToken(userToken)
 	if verifyErr != nil {
 		return nil, status.Error(
@@ -357,12 +354,10 @@ func (*server) Logout(ctx context.Context, in *authenticationpb.LogoutRequest) (
 
 	filter := bson.M{"user_email": userPayload.UserEmail}
 	updateInterface := bson.D{primitive.E{Key: "$pull", Value: bson.M{"authorization": bson.M{"device_unique_id": deviceUniqueId}}}}
-	result, updateErr := authenticationCollection.UpdateOne(context.Background(), filter, updateInterface)
+	_, updateErr := authenticationCollection.UpdateOne(context.Background(), filter, updateInterface)
 	if updateErr != nil {
-		fmt.Printf("Pull not executed: %v", updateErr)
 		return nil, updateErr
 	}
-	fmt.Printf("RES: %v", result.MatchedCount)
 
 	return &authenticationpb.LougoutRespone{}, nil
 }
@@ -381,7 +376,7 @@ func (*server) CreateAccount(ctx context.Context, in *authenticationpb.CreateAcc
 		IsActivated: false,
 		DateCreated: time.Now(),
 	}
-	fmt.Printf("RES: %v", createAccountInfo.Password)
+
 	/// find user email exist or not
 	filter := bson.M{"user_email": userData.UserEmail}
 	result := authenticationCollection.FindOne(context.Background(), filter)
@@ -414,6 +409,7 @@ func (*server) CreateAccount(ctx context.Context, in *authenticationpb.CreateAcc
 
 /////////////////////////////// Email Verification //////////////////////
 func (*server) EmailVerification(ctx context.Context, in *authenticationpb.EmailVerificationRequest) (*authenticationpb.EmailVerificationRespone, error) {
+	fmt.Println("Email revoke")
 	//get user data
 	userDataCh := make(chan *emailVerification)
 
@@ -447,11 +443,13 @@ func (*server) EmailVerification(ctx context.Context, in *authenticationpb.Email
 			fmt.Sprintf("Wrong Argument: %v", err),
 		)
 	}
+	defer close(errCh)
 	return &authenticationpb.EmailVerificationRespone{}, nil
 }
 
 /////////////////////////////// Email Code Verification //////////////////////
 func (*server) EmailVerificationCode(ctx context.Context, in *authenticationpb.EmailVerificationCodeRequest) (*authenticationpb.EmailVerificationCodeRespone, error) {
+	fmt.Println("Email revoke")
 	/// Temp variable for false return
 	returnFalse := &authenticationpb.EmailVerificationCodeRespone{
 		VerifyStatus: true,
@@ -540,7 +538,7 @@ func (*server) EmailVerificationCode(ctx context.Context, in *authenticationpb.E
 
 //////////////////////////////////// Forgot Password ////////////////
 func (*server) ForgotPassword(ctx context.Context, in *authenticationpb.ForgotPasswordResquest) (*authenticationpb.ForgotPasswordRespone, error) {
-
+	fmt.Println("forgot revoke")
 	//timeStartCh := time.Now()
 	filter := bson.M{"user_email": in.GetEmail()}
 
@@ -597,7 +595,6 @@ func (*server) ChangePassword(ctx context.Context, in *authenticationpb.ChangePa
 
 	userPayloadCh := make(chan *authentication.Payload)
 	userPassword := in.GetPassword()
-	fmt.Printf("Password: %v", userPassword)
 	errCh := make(chan error)
 	go func() {
 		token, err := authentication.ReadTokenFromHeader(ctx)
