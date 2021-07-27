@@ -544,52 +544,92 @@ func (*server) ForgotPassword(ctx context.Context, in *authenticationpb.ForgotPa
 
 	serverData := &userInfo{}
 	result := authenticationCollection.FindOne(context.Background(), filter)
-	if err1 := result.Decode(serverData); err1 != nil {
+	if err := result.Decode(serverData); err != nil {
 		return nil, status.Error(
 			codes.NotFound,
 			"EMAIL_NOT_EXIST",
 		)
 	}
 
-	errCh := make(chan error)
-	userDataCh := make(chan *emailVerification)
-	go func() {
-		verifyCode, err := strconv.Atoi(authentication.SendMail(in.GetEmail()))
-		userDataCh <- &emailVerification{
-			UserEmail:            in.GetEmail(),
-			VerifyCode:           verifyCode,
-			DateExpiredCodeEpoch: int(time.Now().Add(time.Minute * 10).Unix()),
-		}
-		errCh <- err
-	}()
-
-	go func() {
-		findRes := emailVerificationCollection.FindOne(context.Background(), filter)
-		if findRes.Err() == nil {
-			_, err := emailVerificationCollection.ReplaceOne(context.Background(), filter, <-userDataCh)
-			errCh <- err
-		} else {
-			_, err := emailVerificationCollection.InsertOne(context.Background(), <-userDataCh)
-			errCh <- err
-		}
-	}()
-	/// Find and replace if exist
-	err := <-errCh
-	if err != nil {
-		return nil, status.Errorf(
-			codes.InvalidArgument,
-			fmt.Sprintf("Wrong Argument: %v", err),
-		)
+	verifyCode, err1 := strconv.Atoi(authentication.SendMail(in.GetEmail()))
+	if err1 != nil {
+		return nil, err1
 	}
-	defer close(errCh)
-	// defer func() {
-	// 	countNumber++
-	// 	count += time.Since(timeStartCh)
-	// 	fmt.Printf("Duration Num: %v, Time: %v", countNumber, count)
-	// }()
+	userPayload := &emailVerification{
+		UserEmail:            in.GetEmail(),
+		VerifyCode:           verifyCode,
+		DateExpiredCodeEpoch: int(time.Now().Add(time.Minute * 10).Unix()),
+	}
+	findRes := emailVerificationCollection.FindOne(context.Background(), filter)
+	if findRes.Err() == nil {
+		_, err2 := emailVerificationCollection.ReplaceOne(context.Background(), filter, userPayload)
+		if err1 != nil {
+			return nil, err2
+		}
+	} else {
+		_, err2 := emailVerificationCollection.InsertOne(context.Background(), userPayload)
+		if err2 != nil {
+			return nil, err2
+		}
+	}
+	/// Find and replace if exist
 
 	return &authenticationpb.ForgotPasswordRespone{}, nil
 }
+
+// func (*server) ForgotPassword(ctx context.Context, in *authenticationpb.ForgotPasswordResquest) (*authenticationpb.ForgotPasswordRespone, error) {
+// 	fmt.Println("forgot revoke")
+// 	//timeStartCh := time.Now()
+// 	filter := bson.M{"user_email": in.GetEmail()}
+
+// 	serverData := &userInfo{}
+// 	result := authenticationCollection.FindOne(context.Background(), filter)
+// 	if err1 := result.Decode(serverData); err1 != nil {
+// 		return nil, status.Error(
+// 			codes.NotFound,
+// 			"EMAIL_NOT_EXIST",
+// 		)
+// 	}
+
+// 	errCh := make(chan error)
+// 	userDataCh := make(chan *emailVerification)
+// 	go func() {
+// 		verifyCode, err := strconv.Atoi(authentication.SendMail(in.GetEmail()))
+// 		userDataCh <- &emailVerification{
+// 			UserEmail:            in.GetEmail(),
+// 			VerifyCode:           verifyCode,
+// 			DateExpiredCodeEpoch: int(time.Now().Add(time.Minute * 10).Unix()),
+// 		}
+// 		errCh <- err
+// 	}()
+
+// 	go func() {
+// 		findRes := emailVerificationCollection.FindOne(context.Background(), filter)
+// 		if findRes.Err() == nil {
+// 			_, err := emailVerificationCollection.ReplaceOne(context.Background(), filter, <-userDataCh)
+// 			errCh <- err
+// 		} else {
+// 			_, err := emailVerificationCollection.InsertOne(context.Background(), <-userDataCh)
+// 			errCh <- err
+// 		}
+// 	}()
+// 	/// Find and replace if exist
+// 	err := <-errCh
+// 	if err != nil {
+// 		return nil, status.Errorf(
+// 			codes.InvalidArgument,
+// 			fmt.Sprintf("Wrong Argument: %v", err),
+// 		)
+// 	}
+// 	defer close(errCh)
+// 	// defer func() {
+// 	// 	countNumber++
+// 	// 	count += time.Since(timeStartCh)
+// 	// 	fmt.Printf("Duration Num: %v, Time: %v", countNumber, count)
+// 	// }()
+
+// 	return &authenticationpb.ForgotPasswordRespone{}, nil
+// }
 
 func (*server) ChangePassword(ctx context.Context, in *authenticationpb.ChangePasswordResquest) (*authenticationpb.ChangePasswordRespone, error) {
 
