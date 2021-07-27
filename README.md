@@ -14,5 +14,6 @@ Set up for Server:
 Run at Same directory as server file or else it'll be ERROR
 
 FOR EXAMPLE:
----- cd ./Mineloop-Education-Server/authentication ------ \n
+---- cd ./Mineloop-Education-Server/authentication ------
+
 ---- go run server.go ---------------
