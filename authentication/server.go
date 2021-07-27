@@ -544,7 +544,7 @@ func (*server) ForgotPassword(ctx context.Context, in *authenticationpb.ForgotPa
 
 	serverData := &userInfo{}
 	result := authenticationCollection.FindOne(context.Background(), filter)
-	if err := result.Decode(serverData); err != nil {
+	if err1 := result.Decode(serverData); err1 != nil {
 		return nil, status.Error(
 			codes.NotFound,
 			"EMAIL_NOT_EXIST",
@@ -581,13 +581,6 @@ func (*server) ForgotPassword(ctx context.Context, in *authenticationpb.ForgotPa
 			fmt.Sprintf("Wrong Argument: %v", err),
 		)
 	}
-	defer close(errCh)
-	// defer func() {
-	// 	countNumber++
-	// 	count += time.Since(timeStartCh)
-	// 	fmt.Printf("Duration Num: %v, Time: %v", countNumber, count)
-	// }()
-
 	return &authenticationpb.ForgotPasswordRespone{}, nil
 }
 
@@ -617,6 +610,5 @@ func (*server) ChangePassword(ctx context.Context, in *authenticationpb.ChangePa
 	if message != nil {
 		return nil, message
 	}
-	defer close(errCh)
 	return &authenticationpb.ChangePasswordRespone{}, nil
 }

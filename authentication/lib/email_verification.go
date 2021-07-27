@@ -43,6 +43,7 @@ func SendMail(email string) string {
 	//Authentication
 	auth := smtp.PlainAuth("", from, password, smtpHost)
 
+	///////// REMEMBER RUN AS SERVER DIRECTORY
 	t, _ := template.ParseFiles("lib/email-verification-template.html")
 
 	var body bytes.Buffer
