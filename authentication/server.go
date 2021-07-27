@@ -27,14 +27,14 @@ import (
 
 const authenticationPort string = ":50010"
 const secretKey string = "171099"
+const mongoConnectionString = "mongodb+srv://mineloop99:hungthjkju2@mineloop-education-serv.ys7hr.mongodb.net/test"
 
 var tool authentication.Tools
 
 const _expiryDate = time.Hour * 24 * 30
 
-type server struct { //// Create new token
-
-	authenticationpb.UnimplementedAuthenticationServer
+type server struct {
+	authenticationpb.UnimplementedAuthenticationServicesServer
 }
 
 var authenticationCollection *mongo.Collection
@@ -92,7 +92,7 @@ func main() {
 	////connect MongoDB
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	client, err := mongo.Connect(ctx, options.Client().ApplyURI("mongodb+srv://mineloop99:hungthjkju2@mineloop-education-serv.ys7hr.mongodb.net/test"))
+	client, err := mongo.Connect(ctx, options.Client().ApplyURI(mongoConnectionString))
 	if err != nil {
 		log.Fatalf("Failed to connect: %v", err)
 	}
@@ -102,7 +102,7 @@ func main() {
 	emailVerificationCollection = client.Database(databaseName).Collection("email_verification")
 
 	// Register Server
-	authenticationpb.RegisterAuthenticationServer(s, &server{})
+	authenticationpb.RegisterAuthenticationServicesServer(s, &server{})
 	go func() {
 		if err := s.Serve(lis); err != nil {
 			log.Fatalf("failed to serve: %v", err)
@@ -149,7 +149,7 @@ func (*server) Testing(ctx context.Context, in *authenticationpb.TestingRequest)
 /////////////////////////////// LOGIN //////////////////////
 func (*server) Login(ctx context.Context, in *authenticationpb.LoginRequest) (*authenticationpb.LoginRespone, error) {
 	println("Login revoke")
-	loginInfo := in.GetAccountInformation()
+	loginInfo := in.GetAccountAuthorization()
 	deviceId := in.GetDeviceUniqueId()
 
 	/// get user server
@@ -365,7 +365,7 @@ func (*server) Logout(ctx context.Context, in *authenticationpb.LogoutRequest) (
 /////////////////////////////// REGISTER //////////////////////
 func (*server) CreateAccount(ctx context.Context, in *authenticationpb.CreateAccountRequest) (*authenticationpb.CreateAccountRespone, error) {
 
-	createAccountInfo := in.GetAccountInformation()
+	createAccountInfo := in.GetAccountAuthorization()
 	falseReturn := &authenticationpb.CreateAccountRespone{
 		CreateStatus: false,
 	}
@@ -610,4 +610,35 @@ func (*server) ChangePassword(ctx context.Context, in *authenticationpb.ChangePa
 		return nil, message
 	}
 	return &authenticationpb.ChangePasswordRespone{}, nil
+}
+
+func (*server) Authorization(ctx context.Context, in *authenticationpb.AuthorizationRequest) (*authenticationpb.AuthorizationRespone, error) {
+
+	falseReturn := &authenticationpb.AuthorizationRespone{
+		IsAuthorized: false,
+	}
+	userPayload, err := tool.VerifyToken(in.GetToken())
+	if err != nil {
+		return falseReturn, err
+	}
+
+	filter := bson.M{"user_email": userPayload.UserEmail, "authorization.id": userPayload.ID}
+
+	errCh := make(chan error)
+	go func() {
+		result := authenticationCollection.FindOne(context.Background(), filter)
+		errCh <- result.Err()
+	}()
+
+	if in.GetUserEmail() != userPayload.UserEmail {
+		return falseReturn, nil
+	}
+
+	if <-errCh != nil {
+		return falseReturn, nil
+	}
+
+	return &authenticationpb.AuthorizationRespone{
+		IsAuthorized: true,
+	}, nil
 }

@@ -4,7 +4,7 @@ package authentication;
 option go_package = "/authenticationpb";
 
 
-service Authentication {
+service AuthenticationServices {
 
     // for test purpose only
     rpc Testing (TestingRequest) returns (TestingRespone);
@@ -26,6 +26,8 @@ service Authentication {
     
     /// Same use with change password ///
     rpc ChangePassword (ChangePasswordResquest) returns (ChangePasswordRespone);
+
+    rpc Authorization (AuthorizationRequest) returns (AuthorizationRespone);
 }
 
 
@@ -35,7 +37,7 @@ message TestingRespone {
 }
 
 
-message AccountInformation {
+message AccountAuthorization {
     string user_email = 1;
     string password = 2;
 }
@@ -51,7 +53,7 @@ message AutoLoginRespone {
 
 
 message LoginRequest {
-    AccountInformation account_information = 1;
+    AccountAuthorization account_authorization = 1;
     string device_unique_id = 2;
 }
 message LoginRespone {
@@ -71,7 +73,7 @@ message LougoutRespone {
 
 
 message CreateAccountRequest {
-    AccountInformation account_information = 1;
+    AccountAuthorization account_authorization = 1;
 }
 message CreateAccountRespone {
     bool create_status = 1;
@@ -107,4 +109,11 @@ message ChangePasswordResquest {
     string password = 1;
 }
 message ChangePasswordRespone {
+}
+
+message AuthorizationRequest {
+    string token = 1;
+}
+message AuthorizationRespone {
+    bool is_authorized = 1;
 }
