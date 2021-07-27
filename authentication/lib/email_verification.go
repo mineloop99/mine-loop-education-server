@@ -7,7 +7,8 @@ import (
 	"io"
 	"log"
 	"net/smtp"
-	"os"
+	"path/filepath"
+	"runtime"
 	"text/template"
 )
 
@@ -26,11 +27,9 @@ func generateRandomCode(max int) string {
 }
 
 func SendMail(email string) string {
-	path, err1 := os.Getwd()
-	if err1 != nil {
-		log.Println(err1)
-	}
-	fmt.Println(path)
+	_, b, _, _ := runtime.Caller(0)
+	basepath := filepath.Dir(b)
+	fmt.Println(basepath)
 	verificationCode := generateRandomCode(6)
 	// Sender data.
 	from := "mineloopeducation@gmail.com"
