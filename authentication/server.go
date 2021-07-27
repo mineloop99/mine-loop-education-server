@@ -443,7 +443,6 @@ func (*server) EmailVerification(ctx context.Context, in *authenticationpb.Email
 			fmt.Sprintf("Wrong Argument: %v", err),
 		)
 	}
-	defer close(errCh)
 	return &authenticationpb.EmailVerificationRespone{}, nil
 }
 
