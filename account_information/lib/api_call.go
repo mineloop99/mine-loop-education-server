@@ -2,6 +2,7 @@ package apiCall
 
 import (
 	"context"
+	"fmt"
 	"log"
 
 	"github.com/wanatabeyuu/mine-loop-education-server/authentication/authenticationpb"
@@ -9,7 +10,7 @@ import (
 	"google.golang.org/grpc"
 )
 
-const authenticationConnectionString = "13.75.66.33:50010"
+const authenticationConnectionString = "mineloop99.eastasia.cloudapp.azure.com:50010"
 
 func ConnectServerAPI() authenticationpb.AuthenticationServicesClient {
 	opts := grpc.WithInsecure()
@@ -22,6 +23,7 @@ func ConnectServerAPI() authenticationpb.AuthenticationServicesClient {
 }
 
 func AuthorizationCall(ctx context.Context, c authenticationpb.AuthenticationServicesClient) (string, error) {
+
 	token, errRead := authentication.ReadTokenFromHeader(ctx)
 	if errRead != nil {
 		return "", errRead
@@ -35,6 +37,6 @@ func AuthorizationCall(ctx context.Context, c authenticationpb.AuthenticationSer
 			return "", errAuth
 		}
 	}
-	log.Printf("Respone from Greet: %v", respone.IsAuthorized)
+	fmt.Println("token: ", token, "UserMail: ", respone)
 	return respone.GetUserEmail(), nil
 }

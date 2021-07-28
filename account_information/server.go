@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/signal"
 	"time"
+	"unicode"
 
 	accountInformationpb "github.com/wanatabeyuu/mine-loop-education-server/account_information/account_informationpb"
 	apiCall "github.com/wanatabeyuu/mine-loop-education-server/account_information/lib"
@@ -16,6 +17,8 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 const accountInformationPort = ":50011"
@@ -32,12 +35,14 @@ type accountInformationServer struct {
 }
 
 type userInfo struct {
-	Id        primitive.ObjectID `bson:"_id,omitempty"`
-	Username  string             `bson:"username"`
-	Sex       string             `bson:"sex"`
-	Birthday  time.Time          `bson:"birthday"`
-	UserEmail string             `bson:"user_email"`
-	Avatar    string             `bson:"avatar"`
+	UserId          primitive.ObjectID `bson:"_id,omitempty"`
+	Username        string             `bson:"name"`
+	UserSex         string             `bson:"sex"`
+	UserBirthday    time.Time          `bson:"birthday"`
+	UserPhoneNumber string             `bson:"phonenumber"`
+	UserEmail       string             `bson:"email"`
+	UserAvatar      string             `bson:"avatar"`
+	UserWallpaper   string             `bson:"wallpaper"`
 }
 
 func main() {
@@ -105,23 +110,68 @@ func main() {
 	fmt.Println("End of Program")
 }
 
-func EditUserInformation(ctx context.Context, in *accountInformationpb.EditUserInformationRequest) (*accountInformationpb.EditUserInformationRespone, error) {
+func (*accountInformationServer) EditUserInformation(ctx context.Context, in *accountInformationpb.EditUserInformationRequest) (*accountInformationpb.EditUserInformationRespone, error) {
 	userEmailCh := make(chan string)
 	errCh := make(chan error)
 	go func() {
 		userEmail, err := apiCall.AuthorizationCall(ctx, c)
-		if err != nil {
-			errCh <- err
-		}
+		errCh <- err
 		userEmailCh <- userEmail
 	}()
 
-	go func() {
-		userData := in.GetAccountInformation()
-		fmt.Printf("%v", userData)
+	userData := in.GetAccountInformation()
+	/// Validate email
+	var listString []string = []string{
+		userData.UserName,
+		userData.UserSex,
+		userData.UserPhoneNumber,
+		userData.UserAvatar,
+		userData.UserWallpaper,
+	}
+	for _, value := range listString {
+		temp := value
+		go func() {
+			for _, letter := range temp {
+				if !unicode.IsLetter(letter) {
+					errCh <- status.Errorf(
+						codes.InvalidArgument,
+						"Not Valid Character",
+					)
+					return
+				}
+			}
+		}()
+	}
 
+	// Replace Filter Init
+	replaceFilterCh := make(chan *userInfo)
+	go func() {
+		replaceFilter := &userInfo{
+			Username:        userData.UserName,
+			UserSex:         userData.UserSex,
+			UserBirthday:    time.Unix(int64(userData.UserBirthday), 0),
+			UserPhoneNumber: userData.UserPhoneNumber,
+			UserAvatar:      userData.UserAvatar,
+			UserWallpaper:   userData.UserWallpaper,
+		}
+
+		replaceFilter.UserEmail = <-userEmailCh
+		replaceFilterCh <- replaceFilter
 	}()
 
+	// Replace Collection call
+	go func() {
+		// _, err := accountInformationCollection.ReplaceOne(context.Background(),
+		// 	bson.M{"user_email": <-userEmailCh},
+		// 	<-replaceFilterCh)
+		_, err := accountInformationCollection.InsertOne(context.Background(),
+			<-replaceFilterCh)
+		errCh <- err
+	}()
+	if err := <-errCh; err != nil {
+		return nil, err
+	}
+	fmt.Println("Done")
 	return &accountInformationpb.EditUserInformationRespone{}, nil
 }
 
