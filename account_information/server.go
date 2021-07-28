@@ -9,10 +9,10 @@ import (
 	"os/signal"
 	"time"
 
-	"github.com/wanatabeyuu/mine-loop-education-server/account_information/account_informationpb"
-	api_call "github.com/wanatabeyuu/mine-loop-education-server/account_information/lib"
+	accountInformationpb "github.com/wanatabeyuu/mine-loop-education-server/account_information/account_informationpb"
+	apiCall "github.com/wanatabeyuu/mine-loop-education-server/account_information/lib"
 	"github.com/wanatabeyuu/mine-loop-education-server/authentication/authenticationpb"
-	authentication "github.com/wanatabeyuu/mine-loop-education-server/authentication/lib"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"google.golang.org/grpc"
@@ -28,7 +28,16 @@ var c authenticationpb.AuthenticationServicesClient
 const mongoConnectionString = "mongodb+srv://mineloop99:hungthjkju2@mineloop-education-serv.ys7hr.mongodb.net/test"
 
 type accountInformationServer struct {
-	account_informationpb.UnimplementedAccountInformationServiceServer
+	accountInformationpb.UnimplementedAccountInformationServiceServer
+}
+
+type userInfo struct {
+	Id        primitive.ObjectID `bson:"_id,omitempty"`
+	Username  string             `bson:"username"`
+	Sex       string             `bson:"sex"`
+	Birthday  time.Time          `bson:"birthday"`
+	UserEmail string             `bson:"user_email"`
+	Avatar    string             `bson:"avatar"`
 }
 
 func main() {
@@ -70,8 +79,8 @@ func main() {
 	// Define Collection
 	authenticationCollection = client.Database(databaseName).Collection("authentication")
 	accountInformationCollection = client.Database(databaseName).Collection("account_information")
-	// Register Server
-	account_informationpb.RegisterAccountInformationServiceServer(s, &accountInformationServer{})
+	// Register Account Information Server
+	accountInformationpb.RegisterAccountInformationServiceServer(s, &accountInformationServer{})
 	go func() {
 		if err := s.Serve(lis); err != nil {
 			log.Fatalf("failed to serve: %v", err)
@@ -79,7 +88,9 @@ func main() {
 	}()
 	ch := make(chan os.Signal, 1)
 	signal.Notify(ch, os.Interrupt)
-	c = api_call.ConnectServerAPI()
+
+	///Connect to Authorized Server
+	c = apiCall.ConnectServerAPI()
 
 	///Declare Methods with secret key
 
@@ -94,24 +105,27 @@ func main() {
 	fmt.Println("End of Program")
 }
 
-func (*accountInformationServer) WelcomeMessage(ctx context.Context, in *account_informationpb.WelcomeMessageRequest) (*account_informationpb.WelcomeMessageRespone, error) {
-	token, err := authentication.ReadTokenFromHeader(ctx)
-	if err != nil {
-		return nil, err
-	}
-	isAuthorized := api_call.AuthorizationCall(token, c)
+func EditUserInformation(ctx context.Context, in *accountInformationpb.EditUserInformationRequest) (*accountInformationpb.EditUserInformationRespone, error) {
+	userEmailCh := make(chan string)
+	errCh := make(chan error)
+	go func() {
+		userEmail, err := apiCall.AuthorizationCall(ctx, c)
+		if err != nil {
+			errCh <- err
+		}
+		userEmailCh <- userEmail
+	}()
 
-	if isAuthorized {
-		return &account_informationpb.WelcomeMessageRespone{
-			WelcomeMessage: "Hello",
-		}, nil
-	}
-	return &account_informationpb.WelcomeMessageRespone{
-		WelcomeMessage: "Not Hello",
-	}, nil
+	go func() {
+		userData := in.GetAccountInformation()
+		fmt.Printf("%v", userData)
+
+	}()
+
+	return &accountInformationpb.EditUserInformationRespone{}, nil
 }
 
-// func (*server) FetchUserInformation(ctx context.Context, in *account_informationpb.FetchUserInformationRequest) (*account_informationpb.FetchUserInformationRespone, error) {
+// func (*accountInformationServer) FetchUserInformation(ctx context.Context, in *account_informationpb.FetchUserInformationRequest) (*account_informationpb.FetchUserInformationRespone, error) {
 
 // }
 

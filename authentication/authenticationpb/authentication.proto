@@ -116,4 +116,5 @@ message AuthorizationRequest {
 }
 message AuthorizationRespone {
     bool is_authorized = 1;
+    string user_email = 2;
 }

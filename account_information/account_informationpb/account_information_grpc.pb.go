@@ -33,7 +33,7 @@ func NewAccountInformationServiceClient(cc grpc.ClientConnInterface) AccountInfo
 
 func (c *accountInformationServiceClient) WelcomeMessage(ctx context.Context, in *WelcomeMessageRequest, opts ...grpc.CallOption) (*WelcomeMessageRespone, error) {
 	out := new(WelcomeMessageRespone)
-	err := c.cc.Invoke(ctx, "/account_information.AccountInformationService/WelcomeMessage", in, out, opts...)
+	err := c.cc.Invoke(ctx, "/accountInformation.AccountInformationService/WelcomeMessage", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -42,7 +42,7 @@ func (c *accountInformationServiceClient) WelcomeMessage(ctx context.Context, in
 
 func (c *accountInformationServiceClient) FetchUserInformation(ctx context.Context, in *FetchUserInformationRequest, opts ...grpc.CallOption) (*FetchUserInformationRespone, error) {
 	out := new(FetchUserInformationRespone)
-	err := c.cc.Invoke(ctx, "/account_information.AccountInformationService/FetchUserInformation", in, out, opts...)
+	err := c.cc.Invoke(ctx, "/accountInformation.AccountInformationService/FetchUserInformation", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -51,7 +51,7 @@ func (c *accountInformationServiceClient) FetchUserInformation(ctx context.Conte
 
 func (c *accountInformationServiceClient) EditUserInformation(ctx context.Context, in *EditUserInformationRequest, opts ...grpc.CallOption) (*EditUserInformationRespone, error) {
 	out := new(EditUserInformationRespone)
-	err := c.cc.Invoke(ctx, "/account_information.AccountInformationService/EditUserInformation", in, out, opts...)
+	err := c.cc.Invoke(ctx, "/accountInformation.AccountInformationService/EditUserInformation", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -105,7 +105,7 @@ func _AccountInformationService_WelcomeMessage_Handler(srv interface{}, ctx cont
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/account_information.AccountInformationService/WelcomeMessage",
+		FullMethod: "/accountInformation.AccountInformationService/WelcomeMessage",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(AccountInformationServiceServer).WelcomeMessage(ctx, req.(*WelcomeMessageRequest))
@@ -123,7 +123,7 @@ func _AccountInformationService_FetchUserInformation_Handler(srv interface{}, ct
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/account_information.AccountInformationService/FetchUserInformation",
+		FullMethod: "/accountInformation.AccountInformationService/FetchUserInformation",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(AccountInformationServiceServer).FetchUserInformation(ctx, req.(*FetchUserInformationRequest))
@@ -141,7 +141,7 @@ func _AccountInformationService_EditUserInformation_Handler(srv interface{}, ctx
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/account_information.AccountInformationService/EditUserInformation",
+		FullMethod: "/accountInformation.AccountInformationService/EditUserInformation",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(AccountInformationServiceServer).EditUserInformation(ctx, req.(*EditUserInformationRequest))
@@ -153,7 +153,7 @@ func _AccountInformationService_EditUserInformation_Handler(srv interface{}, ctx
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
 var AccountInformationService_ServiceDesc = grpc.ServiceDesc{
-	ServiceName: "account_information.AccountInformationService",
+	ServiceName: "accountInformation.AccountInformationService",
 	HandlerType: (*AccountInformationServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{

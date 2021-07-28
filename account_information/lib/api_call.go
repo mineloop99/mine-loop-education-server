@@ -1,10 +1,11 @@
-package api_call
+package apiCall
 
 import (
 	"context"
 	"log"
 
 	"github.com/wanatabeyuu/mine-loop-education-server/authentication/authenticationpb"
+	authentication "github.com/wanatabeyuu/mine-loop-education-server/authentication/lib"
 	"google.golang.org/grpc"
 )
 
@@ -20,16 +21,20 @@ func ConnectServerAPI() authenticationpb.AuthenticationServicesClient {
 	return authenticationpb.NewAuthenticationServicesClient(cc)
 }
 
-func AuthorizationCall(token string, c authenticationpb.AuthenticationServicesClient) bool {
-
+func AuthorizationCall(ctx context.Context, c authenticationpb.AuthenticationServicesClient) (string, error) {
+	token, errRead := authentication.ReadTokenFromHeader(ctx)
+	if errRead != nil {
+		return "", errRead
+	}
 	req := &authenticationpb.AuthorizationRequest{
 		Token: token,
 	}
-	in, err := c.Authorization(context.Background(), req)
-	if err != nil {
-		log.Fatalf("Error while calling Authorization: %v", err)
-		return false
+	respone, errAuth := c.Authorization(context.Background(), req)
+	if errAuth != nil {
+		if errRead != nil {
+			return "", errAuth
+		}
 	}
-	log.Printf("Respone from Greet: %v", in.IsAuthorized)
-	return true
+	log.Printf("Respone from Greet: %v", respone.IsAuthorized)
+	return respone.GetUserEmail(), nil
 }

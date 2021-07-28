@@ -40,7 +40,7 @@ type server struct {
 var authenticationCollection *mongo.Collection
 var emailVerificationCollection *mongo.Collection
 
-type userInfo struct {
+type userAuth struct {
 	Id            primitive.ObjectID `bson:"_id,omitempty"`
 	UserEmail     string             `bson:"user_email"`
 	Password      string             `bson:"password"`
@@ -153,13 +153,13 @@ func (*server) Login(ctx context.Context, in *authenticationpb.LoginRequest) (*a
 	deviceId := in.GetDeviceUniqueId()
 
 	/// get user server
-	userData := userInfo{
+	userData := userAuth{
 		UserEmail: loginInfo.GetUserEmail(),
 		Password:  authentication.HashPassword(loginInfo.GetPassword(), loginInfo.GetUserEmail()),
 	}
 
 	///Get data server
-	serverData := &userInfo{}
+	serverData := &userAuth{}
 	filter := bson.M{"user_email": userData.UserEmail}
 	result := authenticationCollection.FindOne(context.Background(), filter)
 	if err := result.Decode(serverData); err != nil {
@@ -254,7 +254,7 @@ func (*server) AutoLogin(ctx context.Context, in *authenticationpb.AutoLoginRequ
 	}
 
 	//Get Server Data matched with user
-	serverData := &userInfo{}
+	serverData := &userAuth{}
 	filter := bson.M{"user_email": userPayload.UserEmail}
 	result := authenticationCollection.FindOne(context.Background(), filter)
 	if err := result.Decode(serverData); err != nil {
@@ -370,7 +370,7 @@ func (*server) CreateAccount(ctx context.Context, in *authenticationpb.CreateAcc
 		CreateStatus: false,
 	}
 	/// get request data
-	userData := userInfo{
+	userData := userAuth{
 		UserEmail:   createAccountInfo.GetUserEmail(),
 		Password:    authentication.HashPassword(createAccountInfo.GetPassword(), createAccountInfo.GetUserEmail()),
 		IsActivated: false,
@@ -541,7 +541,7 @@ func (*server) ForgotPassword(ctx context.Context, in *authenticationpb.ForgotPa
 	//timeStartCh := time.Now()
 	filter := bson.M{"user_email": in.GetEmail()}
 
-	serverData := &userInfo{}
+	serverData := &userAuth{}
 	result := authenticationCollection.FindOne(context.Background(), filter)
 	if err1 := result.Decode(serverData); err1 != nil {
 		return nil, status.Error(
@@ -616,6 +616,7 @@ func (*server) Authorization(ctx context.Context, in *authenticationpb.Authoriza
 
 	falseReturn := &authenticationpb.AuthorizationRespone{
 		IsAuthorized: false,
+		UserEmail:    "",
 	}
 	userPayload, err := tool.VerifyToken(in.GetToken())
 	if err != nil {
@@ -636,5 +637,6 @@ func (*server) Authorization(ctx context.Context, in *authenticationpb.Authoriza
 
 	return &authenticationpb.AuthorizationRespone{
 		IsAuthorized: true,
+		UserEmail:    userPayload.UserEmail,
 	}, nil
 }

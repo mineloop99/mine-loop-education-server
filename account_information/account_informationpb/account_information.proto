@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package account_information;
+package accountInformation;
 
 option go_package = "/account_informationpb";
 
@@ -12,6 +12,7 @@ service AccountInformationService {
     rpc EditUserInformation (EditUserInformationRequest) returns (EditUserInformationRespone);
 }
 
+
 message AccountInformation {
     string user_name = 1;
     string user_birthday = 2;
@@ -20,18 +21,20 @@ message AccountInformation {
     string user_email = 5;
 }
 
+
 message WelcomeMessageRequest {
-    
 }
 message WelcomeMessageRespone {
     string welcome_message = 1;
 }
+
 
 message FetchUserInformationRequest {
 }
 message FetchUserInformationRespone {
     AccountInformation account_information = 1; 
 }
+
 
 message EditUserInformationRequest {
     AccountInformation account_information = 1; 
