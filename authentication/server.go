@@ -87,7 +87,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to serve: %v", err)
 	} else {
-		println("Initilize Server...")
+		println("Initilize Account Auth Server...")
 	}
 	////connect MongoDB
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
