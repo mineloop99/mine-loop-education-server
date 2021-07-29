@@ -2,7 +2,6 @@ package apiCall
 
 import (
 	"context"
-	"fmt"
 	"log"
 
 	"github.com/wanatabeyuu/mine-loop-education-server/authentication/authenticationpb"
@@ -10,7 +9,7 @@ import (
 	"google.golang.org/grpc"
 )
 
-const authenticationConnectionString = "mineloop99.eastasia.cloudapp.azure.com:50010"
+const authenticationConnectionString = "localhost:50010" //"mineloop99.eastasia.cloudapp.azure.com:50010"
 
 func ConnectServerAPI() authenticationpb.AuthenticationServicesClient {
 	opts := grpc.WithInsecure()
@@ -22,21 +21,18 @@ func ConnectServerAPI() authenticationpb.AuthenticationServicesClient {
 	return authenticationpb.NewAuthenticationServicesClient(cc)
 }
 
-func AuthorizationCall(ctx context.Context, c authenticationpb.AuthenticationServicesClient) (string, error) {
+func AuthorizationCall(ctx context.Context, c authenticationpb.AuthenticationServicesClient) (string, string, error) {
 
 	token, errRead := authentication.ReadTokenFromHeader(ctx)
 	if errRead != nil {
-		return "", errRead
+		return "", "", errRead
 	}
 	req := &authenticationpb.AuthorizationRequest{
 		Token: token,
 	}
 	respone, errAuth := c.Authorization(context.Background(), req)
 	if errAuth != nil {
-		if errRead != nil {
-			return "", errAuth
-		}
+		return "", "", errAuth
 	}
-	fmt.Println("token: ", token, "UserMail: ", respone)
-	return respone.GetUserEmail(), nil
+	return respone.GetObjectId(), respone.GetUserEmail(), nil
 }

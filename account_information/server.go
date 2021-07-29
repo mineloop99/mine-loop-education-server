@@ -8,12 +8,11 @@ import (
 	"os"
 	"os/signal"
 	"time"
-	"unicode"
 
 	accountInformationpb "github.com/wanatabeyuu/mine-loop-education-server/account_information/account_informationpb"
 	apiCall "github.com/wanatabeyuu/mine-loop-education-server/account_information/lib"
 	"github.com/wanatabeyuu/mine-loop-education-server/authentication/authenticationpb"
-	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"google.golang.org/grpc"
@@ -23,7 +22,6 @@ import (
 
 const accountInformationPort = ":50011"
 
-var authenticationCollection *mongo.Collection
 var accountInformationCollection *mongo.Collection
 
 var c authenticationpb.AuthenticationServicesClient
@@ -35,14 +33,14 @@ type accountInformationServer struct {
 }
 
 type userInfo struct {
-	UserId          primitive.ObjectID `bson:"_id,omitempty"`
-	Username        string             `bson:"name"`
-	UserSex         string             `bson:"sex"`
-	UserBirthday    time.Time          `bson:"birthday"`
-	UserPhoneNumber string             `bson:"phonenumber"`
-	UserEmail       string             `bson:"email"`
-	UserAvatar      string             `bson:"avatar"`
-	UserWallpaper   string             `bson:"wallpaper"`
+	Id              string    `bson:"_id,omitempty"`
+	Username        string    `bson:"name"`
+	UserSex         string    `bson:"sex"`
+	UserBirthday    time.Time `bson:"birthday"`
+	UserPhoneNumber string    `bson:"phonenumber"`
+	UserEmail       string    `bson:"email"`
+	UserAvatar      string    `bson:"avatar"`
+	UserWallpaper   string    `bson:"wallpaper"`
 }
 
 func main() {
@@ -82,7 +80,6 @@ func main() {
 	}
 
 	// Define Collection
-	authenticationCollection = client.Database(databaseName).Collection("authentication")
 	accountInformationCollection = client.Database(databaseName).Collection("account_information")
 	// Register Account Information Server
 	accountInformationpb.RegisterAccountInformationServiceServer(s, &accountInformationServer{})
@@ -97,8 +94,6 @@ func main() {
 	///Connect to Authorized Server
 	c = apiCall.ConnectServerAPI()
 
-	///Declare Methods with secret key
-
 	//Block until a signal is received
 	<-ch
 	fmt.Println("Stopping the server")
@@ -112,39 +107,45 @@ func main() {
 
 func (*accountInformationServer) EditUserInformation(ctx context.Context, in *accountInformationpb.EditUserInformationRequest) (*accountInformationpb.EditUserInformationRespone, error) {
 	userEmailCh := make(chan string)
+	userIdCh := make(chan string)
+	doneCh := make(chan bool)
 	errCh := make(chan error)
 	go func() {
-		userEmail, err := apiCall.AuthorizationCall(ctx, c)
-		errCh <- err
+		id, userEmail, err1 := apiCall.AuthorizationCall(ctx, c)
+		errCh <- err1
 		userEmailCh <- userEmail
+		userIdCh <- id
 	}()
 
 	userData := in.GetAccountInformation()
-	/// Validate email
+
+	/// Validate Variables
 	var listString []string = []string{
 		userData.UserName,
 		userData.UserSex,
 		userData.UserPhoneNumber,
-		userData.UserAvatar,
-		userData.UserWallpaper,
 	}
+	validateDoneCh := make(chan bool, len(listString))
 	for _, value := range listString {
-		temp := value
-		go func() {
+		go func(temp string) {
 			for _, letter := range temp {
-				if !unicode.IsLetter(letter) {
-					errCh <- status.Errorf(
+				if letter > 123 || letter < 45 {
+					errCh <- status.Error(
 						codes.InvalidArgument,
-						"Not Valid Character",
+						"CONTAINS_SPECIAL_CHARACTER",
 					)
+					validateDoneCh <- true
 					return
 				}
 			}
-		}()
+			validateDoneCh <- true
+		}(value)
 	}
 
-	// Replace Filter Init
-	replaceFilterCh := make(chan *userInfo)
+	// Replace Data Init
+	var filter bson.M
+	var dataReplace *userInfo
+	isInsert := make(chan bool)
 	go func() {
 		replaceFilter := &userInfo{
 			Username:        userData.UserName,
@@ -154,25 +155,47 @@ func (*accountInformationServer) EditUserInformation(ctx context.Context, in *ac
 			UserAvatar:      userData.UserAvatar,
 			UserWallpaper:   userData.UserWallpaper,
 		}
-
 		replaceFilter.UserEmail = <-userEmailCh
-		replaceFilterCh <- replaceFilter
+		replaceFilter.Id = <-userIdCh
+		filter = bson.M{"email": replaceFilter.UserEmail}
+		///Find Server Data
+		serverData := &userInfo{}
+		result := accountInformationCollection.FindOne(context.Background(), filter)
+		if err := result.Decode(serverData); err != nil {
+			dataReplace = replaceFilter
+			isInsert <- true
+		} else {
+			dataReplace = replaceFilter
+			isInsert <- false
+		}
 	}()
 
 	// Replace Collection call
 	go func() {
-		// _, err := accountInformationCollection.ReplaceOne(context.Background(),
-		// 	bson.M{"user_email": <-userEmailCh},
-		// 	<-replaceFilterCh)
-		_, err := accountInformationCollection.InsertOne(context.Background(),
-			<-replaceFilterCh)
-		errCh <- err
+		for i := 0; i < len(listString); i++ {
+			<-validateDoneCh
+		}
+		if <-isInsert {
+			_, err := accountInformationCollection.InsertOne(context.Background(), dataReplace)
+			errCh <- err
+		} else {
+			_, err := accountInformationCollection.ReplaceOne(context.Background(), filter, dataReplace)
+			errCh <- err
+		}
+		doneCh <- true
 	}()
-	if err := <-errCh; err != nil {
-		return nil, err
+
+	// Checking And Done
+	for {
+		fmt.Println("Done")
+		if err := <-errCh; err != nil {
+			fmt.Println(err)
+			return nil, err
+		} else if <-doneCh {
+			//Done
+			return &accountInformationpb.EditUserInformationRespone{}, nil
+		}
 	}
-	fmt.Println("Done")
-	return &accountInformationpb.EditUserInformationRespone{}, nil
 }
 
 // func (*accountInformationServer) FetchUserInformation(ctx context.Context, in *account_informationpb.FetchUserInformationRequest) (*account_informationpb.FetchUserInformationRespone, error) {

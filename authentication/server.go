@@ -626,9 +626,13 @@ func (*server) Authorization(ctx context.Context, in *authenticationpb.Authoriza
 	filter := bson.M{"user_email": userPayload.UserEmail, "authorization.id": userPayload.ID}
 
 	errCh := make(chan error)
+
+	var getObjectId string
 	go func() {
+		tempData := &userAuth{}
 		result := authenticationCollection.FindOne(context.Background(), filter)
-		errCh <- result.Err()
+		errCh <- result.Decode(tempData)
+		getObjectId = tempData.Id.Hex()
 	}()
 
 	if <-errCh != nil {
@@ -638,5 +642,6 @@ func (*server) Authorization(ctx context.Context, in *authenticationpb.Authoriza
 	return &authenticationpb.AuthorizationRespone{
 		IsAuthorized: true,
 		UserEmail:    userPayload.UserEmail,
+		ObjectId:     getObjectId,
 	}, nil
 }
