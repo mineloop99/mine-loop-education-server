@@ -69,7 +69,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to serve: %v", err)
 	} else {
-		println("Initilize Server...")
+		println("Initilize Account Information Server...")
 	}
 	////connect MongoDB
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -108,7 +108,7 @@ func main() {
 func (*accountInformationServer) EditUserInformation(ctx context.Context, in *accountInformationpb.EditUserInformationRequest) (*accountInformationpb.EditUserInformationRespone, error) {
 	userEmailCh := make(chan string)
 	userIdCh := make(chan string)
-	doneCh := make(chan bool)
+	done := false
 	errCh := make(chan error)
 	go func() {
 		id, userEmail, err1 := apiCall.AuthorizationCall(ctx, c)
@@ -129,7 +129,7 @@ func (*accountInformationServer) EditUserInformation(ctx context.Context, in *ac
 	for _, value := range listString {
 		go func(temp string) {
 			for _, letter := range temp {
-				if letter > 123 || letter < 45 {
+				if letter > 123 || letter < 42 {
 					errCh <- status.Error(
 						codes.InvalidArgument,
 						"CONTAINS_SPECIAL_CHARACTER",
@@ -182,17 +182,15 @@ func (*accountInformationServer) EditUserInformation(ctx context.Context, in *ac
 			_, err := accountInformationCollection.ReplaceOne(context.Background(), filter, dataReplace)
 			errCh <- err
 		}
-		doneCh <- true
+		done = true
 	}()
 
 	// Checking And Done
 	for {
-		fmt.Println("Done")
 		if err := <-errCh; err != nil {
-			fmt.Println(err)
 			return nil, err
-		} else if <-doneCh {
-			//Done
+		} else if done {
+			fmt.Println("Done")
 			return &accountInformationpb.EditUserInformationRespone{}, nil
 		}
 	}
