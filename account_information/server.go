@@ -106,6 +106,7 @@ func main() {
 }
 
 func (*accountInformationServer) EditUserInformation(ctx context.Context, in *accountInformationpb.EditUserInformationRequest) (*accountInformationpb.EditUserInformationRespone, error) {
+
 	userEmailCh := make(chan string)
 	userIdCh := make(chan string)
 	done := false
@@ -196,10 +197,45 @@ func (*accountInformationServer) EditUserInformation(ctx context.Context, in *ac
 	}
 }
 
-// func (*accountInformationServer) FetchUserInformation(ctx context.Context, in *account_informationpb.FetchUserInformationRequest) (*account_informationpb.FetchUserInformationRespone, error) {
+func (*accountInformationServer) FetchUserInformation(ctx context.Context, in *accountInformationpb.FetchUserInformationRequest) (*accountInformationpb.FetchUserInformationRespone, error) {
 
-// }
+	// Get Authorize id
+	id, email, authErr := apiCall.AuthorizationCall(ctx, c)
+	if authErr != nil {
+		return nil, status.Error(
+			codes.NotFound,
+			"CANNOT_AUTHORIZED_YOU",
+		)
+	}
 
-// func (*server) EditUserInformation(ctx context.Context, in *account_informationpb.EditUserInformationRequest) (*account_informationpb.EditUserInformationRespone, error) {
+	// Find Data
+	filter := bson.M{"_id": id}
+	serverData := &userInfo{}
+	res := accountInformationCollection.FindOne(context.Background(), filter)
+	if decodeErr := res.Decode(serverData); decodeErr != nil {
+		return &accountInformationpb.FetchUserInformationRespone{
+			FetchAccountInformation: &accountInformationpb.FetchAccountInformation{
+				UserName:        "User",
+				UserSex:         "Male",
+				UserPhoneNumber: "0",
+				UserEmail:       email,
+				UserBirthday:    int32(time.Now().Unix() - 100000),
+				UserAvatar:      "",
+				UserWallpaper:   "",
+			},
+		}, nil
+	}
 
-// }
+	//FetchData
+	return &accountInformationpb.FetchUserInformationRespone{
+		FetchAccountInformation: &accountInformationpb.FetchAccountInformation{
+			UserName:        serverData.Username,
+			UserBirthday:    int32(serverData.UserBirthday.Unix()),
+			UserSex:         serverData.UserSex,
+			UserPhoneNumber: serverData.UserPhoneNumber,
+			UserEmail:       email,
+			UserAvatar:      serverData.UserAvatar,
+			UserWallpaper:   serverData.UserWallpaper,
+		},
+	}, nil
+}
