@@ -1,0 +1,54 @@
+syntax = "proto3";
+
+package accountInformation;
+
+option go_package = "/account_informationpb";
+
+service AccountInformationService {
+    rpc WelcomeMessage (WelcomeMessageRequest) returns (WelcomeMessageRespone) ;
+
+    rpc FetchUserInformation (FetchUserInformationRequest) returns (FetchUserInformationRespone);
+
+    rpc EditUserInformation (EditUserInformationRequest) returns (EditUserInformationRespone);
+}
+
+
+message AccountInformation {
+    string user_name = 1;
+    int32 user_birthday = 2;
+    string user_sex = 3;
+    string user_phone_number = 4;
+    string user_avatar = 5;
+    string user_wallpaper = 6;
+}
+
+message FetchAccountInformation {
+    string user_name = 1;
+    int32 user_birthday = 2;
+    string user_sex = 3;
+    string user_phone_number = 4;
+    string user_email = 5;
+    string user_avatar = 6;
+    string user_wallpaper = 7;
+}
+
+message WelcomeMessageRequest {
+}
+message WelcomeMessageRespone {
+    string welcome_message = 1;
+}
+
+
+message FetchUserInformationRequest {
+}
+message FetchUserInformationRespone {
+    FetchAccountInformation fetch_account_information = 1; 
+}
+
+
+message EditUserInformationRequest {
+    AccountInformation account_information = 1; 
+}
+message EditUserInformationRespone {
+}
+

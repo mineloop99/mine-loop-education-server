@@ -27,20 +27,20 @@ import (
 
 const authenticationPort string = ":50010"
 const secretKey string = "171099"
+const mongoConnectionString = "mongodb+srv://mineloop99:hungthjkju2@mineloop-education-serv.ys7hr.mongodb.net/test"
 
 var tool authentication.Tools
 
 const _expiryDate = time.Hour * 24 * 30
 
-type server struct { //// Create new token
-
-	authenticationpb.UnimplementedAuthenticationServer
+type server struct {
+	authenticationpb.UnimplementedAuthenticationServicesServer
 }
 
 var authenticationCollection *mongo.Collection
 var emailVerificationCollection *mongo.Collection
 
-type userInfo struct {
+type userAuth struct {
 	Id            primitive.ObjectID `bson:"_id,omitempty"`
 	UserEmail     string             `bson:"user_email"`
 	Password      string             `bson:"password"`
@@ -87,12 +87,12 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to serve: %v", err)
 	} else {
-		println("Initilize Server...")
+		println("Initilize Account Auth Server...")
 	}
 	////connect MongoDB
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	client, err := mongo.Connect(ctx, options.Client().ApplyURI("mongodb+srv://mineloop99:hungthjkju2@mineloop-education-serv.ys7hr.mongodb.net/test"))
+	client, err := mongo.Connect(ctx, options.Client().ApplyURI(mongoConnectionString))
 	if err != nil {
 		log.Fatalf("Failed to connect: %v", err)
 	}
@@ -102,7 +102,7 @@ func main() {
 	emailVerificationCollection = client.Database(databaseName).Collection("email_verification")
 
 	// Register Server
-	authenticationpb.RegisterAuthenticationServer(s, &server{})
+	authenticationpb.RegisterAuthenticationServicesServer(s, &server{})
 	go func() {
 		if err := s.Serve(lis); err != nil {
 			log.Fatalf("failed to serve: %v", err)
@@ -149,17 +149,17 @@ func (*server) Testing(ctx context.Context, in *authenticationpb.TestingRequest)
 /////////////////////////////// LOGIN //////////////////////
 func (*server) Login(ctx context.Context, in *authenticationpb.LoginRequest) (*authenticationpb.LoginRespone, error) {
 	println("Login revoke")
-	loginInfo := in.GetAccountInformation()
+	loginInfo := in.GetAccountAuthorization()
 	deviceId := in.GetDeviceUniqueId()
 
 	/// get user server
-	userData := userInfo{
+	userData := userAuth{
 		UserEmail: loginInfo.GetUserEmail(),
 		Password:  authentication.HashPassword(loginInfo.GetPassword(), loginInfo.GetUserEmail()),
 	}
 
 	///Get data server
-	serverData := &userInfo{}
+	serverData := &userAuth{}
 	filter := bson.M{"user_email": userData.UserEmail}
 	result := authenticationCollection.FindOne(context.Background(), filter)
 	if err := result.Decode(serverData); err != nil {
@@ -254,7 +254,7 @@ func (*server) AutoLogin(ctx context.Context, in *authenticationpb.AutoLoginRequ
 	}
 
 	//Get Server Data matched with user
-	serverData := &userInfo{}
+	serverData := &userAuth{}
 	filter := bson.M{"user_email": userPayload.UserEmail}
 	result := authenticationCollection.FindOne(context.Background(), filter)
 	if err := result.Decode(serverData); err != nil {
@@ -365,12 +365,12 @@ func (*server) Logout(ctx context.Context, in *authenticationpb.LogoutRequest) (
 /////////////////////////////// REGISTER //////////////////////
 func (*server) CreateAccount(ctx context.Context, in *authenticationpb.CreateAccountRequest) (*authenticationpb.CreateAccountRespone, error) {
 
-	createAccountInfo := in.GetAccountInformation()
+	createAccountInfo := in.GetAccountAuthorization()
 	falseReturn := &authenticationpb.CreateAccountRespone{
 		CreateStatus: false,
 	}
 	/// get request data
-	userData := userInfo{
+	userData := userAuth{
 		UserEmail:   createAccountInfo.GetUserEmail(),
 		Password:    authentication.HashPassword(createAccountInfo.GetPassword(), createAccountInfo.GetUserEmail()),
 		IsActivated: false,
@@ -443,7 +443,6 @@ func (*server) EmailVerification(ctx context.Context, in *authenticationpb.Email
 			fmt.Sprintf("Wrong Argument: %v", err),
 		)
 	}
-	defer close(errCh)
 	return &authenticationpb.EmailVerificationRespone{}, nil
 }
 
@@ -538,11 +537,9 @@ func (*server) EmailVerificationCode(ctx context.Context, in *authenticationpb.E
 
 //////////////////////////////////// Forgot Password ////////////////
 func (*server) ForgotPassword(ctx context.Context, in *authenticationpb.ForgotPasswordResquest) (*authenticationpb.ForgotPasswordRespone, error) {
-	fmt.Println("forgot revoke")
-	//timeStartCh := time.Now()
 	filter := bson.M{"user_email": in.GetEmail()}
 
-	serverData := &userInfo{}
+	serverData := &userAuth{}
 	result := authenticationCollection.FindOne(context.Background(), filter)
 	if err1 := result.Decode(serverData); err1 != nil {
 		return nil, status.Error(
@@ -611,4 +608,77 @@ func (*server) ChangePassword(ctx context.Context, in *authenticationpb.ChangePa
 		return nil, message
 	}
 	return &authenticationpb.ChangePasswordRespone{}, nil
+}
+
+func (*server) ChangePasswordWithOldPassword(ctx context.Context, in *authenticationpb.ChangePasswordWithOldPasswordRequest) (*authenticationpb.ChangePasswordWithOldPasswordRespone, error) {
+
+	userOldPassword := in.GetOldPassword()
+	userNewPassword := in.GetNewPassword()
+
+	errCh := make(chan error)
+	var done bool = false
+
+	//Get User Payload
+	userPayloadCh := make(chan *authentication.Payload)
+	go func() {
+		token, err := authentication.ReadTokenFromHeader(ctx)
+		errCh <- err
+		userPayload, err2 := tool.VerifyToken(token)
+		userPayloadCh <- userPayload
+		errCh <- err2
+	}()
+
+	// Find Compare And Update
+	go func() {
+		userPayload := <-userPayloadCh
+		filter := bson.M{"user_email": userPayload.UserEmail, "password": authentication.HashPassword(userOldPassword, userPayload.UserEmail)}
+		updateFilter := bson.D{primitive.E{Key: "$set", Value: bson.M{"password": authentication.HashPassword(userNewPassword, userPayload.UserEmail)}}}
+
+		result := authenticationCollection.FindOneAndUpdate(context.Background(), filter, updateFilter)
+		errCh <- result.Err()
+		done = true
+	}()
+
+	for {
+		message := <-errCh
+		if message != nil {
+			return nil, message
+		} else if done {
+			return &authenticationpb.ChangePasswordWithOldPasswordRespone{}, nil
+		}
+	}
+}
+
+func (*server) Authorization(ctx context.Context, in *authenticationpb.AuthorizationRequest) (*authenticationpb.AuthorizationRespone, error) {
+
+	falseReturn := &authenticationpb.AuthorizationRespone{
+		IsAuthorized: false,
+		UserEmail:    "",
+	}
+	userPayload, err := tool.VerifyToken(in.GetToken())
+	if err != nil {
+		return falseReturn, err
+	}
+
+	filter := bson.M{"user_email": userPayload.UserEmail, "authorization.id": userPayload.ID}
+
+	errCh := make(chan error)
+
+	var getObjectId string
+	go func() {
+		tempData := &userAuth{}
+		result := authenticationCollection.FindOne(context.Background(), filter)
+		errCh <- result.Decode(tempData)
+		getObjectId = tempData.Id.Hex()
+	}()
+
+	if <-errCh != nil {
+		return falseReturn, nil
+	}
+
+	return &authenticationpb.AuthorizationRespone{
+		IsAuthorized: true,
+		UserEmail:    userPayload.UserEmail,
+		ObjectId:     getObjectId,
+	}, nil
 }

@@ -1,0 +1,1 @@
+protoc account_informationpbcd/account_information.proto --go_out=. --go-grpc_out=.
