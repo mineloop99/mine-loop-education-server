@@ -24,10 +24,12 @@ service AuthenticationServices {
     /// Send request Only ////
     rpc ForgotPassword (ForgotPasswordResquest) returns (ForgotPasswordRespone);
     
-    /// Same use with change password ///
+    /// Change With Forgot Password Button ///
     rpc ChangePassword (ChangePasswordResquest) returns (ChangePasswordRespone);
 
     rpc Authorization (AuthorizationRequest) returns (AuthorizationRespone);
+
+    rpc ChangePasswordWithOldPassword (ChangePasswordWithOldPasswordRequest) returns (ChangePasswordWithOldPasswordRespone);
 }
 
 
@@ -109,6 +111,13 @@ message ChangePasswordResquest {
     string password = 1;
 }
 message ChangePasswordRespone {
+}
+
+message ChangePasswordWithOldPasswordRequest {
+    string old_password = 1;
+    string new_password = 2;
+}
+message ChangePasswordWithOldPasswordRespone {
 }
 
 message AuthorizationRequest {

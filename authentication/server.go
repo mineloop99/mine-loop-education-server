@@ -537,8 +537,6 @@ func (*server) EmailVerificationCode(ctx context.Context, in *authenticationpb.E
 
 //////////////////////////////////// Forgot Password ////////////////
 func (*server) ForgotPassword(ctx context.Context, in *authenticationpb.ForgotPasswordResquest) (*authenticationpb.ForgotPasswordRespone, error) {
-	fmt.Println("forgot revoke")
-	//timeStartCh := time.Now()
 	filter := bson.M{"user_email": in.GetEmail()}
 
 	serverData := &userAuth{}
@@ -610,6 +608,45 @@ func (*server) ChangePassword(ctx context.Context, in *authenticationpb.ChangePa
 		return nil, message
 	}
 	return &authenticationpb.ChangePasswordRespone{}, nil
+}
+
+func (*server) ChangePasswordWithOldPassword(ctx context.Context, in *authenticationpb.ChangePasswordWithOldPasswordRequest) (*authenticationpb.ChangePasswordWithOldPasswordRespone, error) {
+
+	userOldPassword := in.GetOldPassword()
+	userNewPassword := in.GetNewPassword()
+
+	errCh := make(chan error)
+	var done bool = false
+
+	//Get User Payload
+	userPayloadCh := make(chan *authentication.Payload)
+	go func() {
+		token, err := authentication.ReadTokenFromHeader(ctx)
+		errCh <- err
+		userPayload, err2 := tool.VerifyToken(token)
+		userPayloadCh <- userPayload
+		errCh <- err2
+	}()
+
+	// Find Compare And Update
+	go func() {
+		userPayload := <-userPayloadCh
+		filter := bson.M{"user_email": userPayload.UserEmail, "password": authentication.HashPassword(userOldPassword, userPayload.UserEmail)}
+		updateFilter := bson.D{primitive.E{Key: "$set", Value: bson.M{"password": authentication.HashPassword(userNewPassword, userPayload.UserEmail)}}}
+
+		result := authenticationCollection.FindOneAndUpdate(context.Background(), filter, updateFilter)
+		errCh <- result.Err()
+		done = true
+	}()
+
+	for {
+		message := <-errCh
+		if message != nil {
+			return nil, message
+		} else if done {
+			return &authenticationpb.ChangePasswordWithOldPasswordRespone{}, nil
+		}
+	}
 }
 
 func (*server) Authorization(ctx context.Context, in *authenticationpb.AuthorizationRequest) (*authenticationpb.AuthorizationRespone, error) {

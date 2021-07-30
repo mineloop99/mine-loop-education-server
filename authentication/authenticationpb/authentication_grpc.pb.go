@@ -28,9 +28,10 @@ type AuthenticationServicesClient interface {
 	EmailVerificationCode(ctx context.Context, in *EmailVerificationCodeRequest, opts ...grpc.CallOption) (*EmailVerificationCodeRespone, error)
 	/// Send request Only ////
 	ForgotPassword(ctx context.Context, in *ForgotPasswordResquest, opts ...grpc.CallOption) (*ForgotPasswordRespone, error)
-	/// Same use with change password ///
+	/// Change With Forgot Password Button ///
 	ChangePassword(ctx context.Context, in *ChangePasswordResquest, opts ...grpc.CallOption) (*ChangePasswordRespone, error)
 	Authorization(ctx context.Context, in *AuthorizationRequest, opts ...grpc.CallOption) (*AuthorizationRespone, error)
+	ChangePasswordWithOldPassword(ctx context.Context, in *ChangePasswordWithOldPasswordRequest, opts ...grpc.CallOption) (*ChangePasswordWithOldPasswordRespone, error)
 }
 
 type authenticationServicesClient struct {
@@ -131,6 +132,15 @@ func (c *authenticationServicesClient) Authorization(ctx context.Context, in *Au
 	return out, nil
 }
 
+func (c *authenticationServicesClient) ChangePasswordWithOldPassword(ctx context.Context, in *ChangePasswordWithOldPasswordRequest, opts ...grpc.CallOption) (*ChangePasswordWithOldPasswordRespone, error) {
+	out := new(ChangePasswordWithOldPasswordRespone)
+	err := c.cc.Invoke(ctx, "/authentication.AuthenticationServices/ChangePasswordWithOldPassword", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // AuthenticationServicesServer is the server API for AuthenticationServices service.
 // All implementations must embed UnimplementedAuthenticationServicesServer
 // for forward compatibility
@@ -145,9 +155,10 @@ type AuthenticationServicesServer interface {
 	EmailVerificationCode(context.Context, *EmailVerificationCodeRequest) (*EmailVerificationCodeRespone, error)
 	/// Send request Only ////
 	ForgotPassword(context.Context, *ForgotPasswordResquest) (*ForgotPasswordRespone, error)
-	/// Same use with change password ///
+	/// Change With Forgot Password Button ///
 	ChangePassword(context.Context, *ChangePasswordResquest) (*ChangePasswordRespone, error)
 	Authorization(context.Context, *AuthorizationRequest) (*AuthorizationRespone, error)
+	ChangePasswordWithOldPassword(context.Context, *ChangePasswordWithOldPasswordRequest) (*ChangePasswordWithOldPasswordRespone, error)
 	mustEmbedUnimplementedAuthenticationServicesServer()
 }
 
@@ -184,6 +195,9 @@ func (UnimplementedAuthenticationServicesServer) ChangePassword(context.Context,
 }
 func (UnimplementedAuthenticationServicesServer) Authorization(context.Context, *AuthorizationRequest) (*AuthorizationRespone, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Authorization not implemented")
+}
+func (UnimplementedAuthenticationServicesServer) ChangePasswordWithOldPassword(context.Context, *ChangePasswordWithOldPasswordRequest) (*ChangePasswordWithOldPasswordRespone, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ChangePasswordWithOldPassword not implemented")
 }
 func (UnimplementedAuthenticationServicesServer) mustEmbedUnimplementedAuthenticationServicesServer() {
 }
@@ -379,6 +393,24 @@ func _AuthenticationServices_Authorization_Handler(srv interface{}, ctx context.
 	return interceptor(ctx, in, info, handler)
 }
 
+func _AuthenticationServices_ChangePasswordWithOldPassword_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ChangePasswordWithOldPasswordRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AuthenticationServicesServer).ChangePasswordWithOldPassword(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/authentication.AuthenticationServices/ChangePasswordWithOldPassword",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AuthenticationServicesServer).ChangePasswordWithOldPassword(ctx, req.(*ChangePasswordWithOldPasswordRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // AuthenticationServices_ServiceDesc is the grpc.ServiceDesc for AuthenticationServices service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -425,6 +457,10 @@ var AuthenticationServices_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Authorization",
 			Handler:    _AuthenticationServices_Authorization_Handler,
+		},
+		{
+			MethodName: "ChangePasswordWithOldPassword",
+			Handler:    _AuthenticationServices_ChangePasswordWithOldPassword_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
