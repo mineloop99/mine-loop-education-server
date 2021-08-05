@@ -40,7 +40,7 @@ message TestingRespone {
 
 
 message AccountAuthorization {
-    string user_email = 1;
+    string email = 1;
     string password = 2;
 }
 
@@ -65,11 +65,11 @@ message LoginRespone {
 
 
 message LogoutRequest {
-    string user_email = 1;
+    string email = 1;
     string device_unique_id = 2;
 }
 message LougoutRespone {
-    string user_email = 1;
+    string email = 1;
     string device_unique_id = 2;
 }
 
@@ -125,6 +125,6 @@ message AuthorizationRequest {
 }
 message AuthorizationRespone {
     bool is_authorized = 1;
-    string user_email = 2;
+    string email = 2;
     string objectId = 3;
 }

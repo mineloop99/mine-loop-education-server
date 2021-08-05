@@ -14,22 +14,22 @@ service AccountInformationService {
 
 
 message AccountInformation {
-    string user_name = 1;
-    int32 user_birthday = 2;
-    string user_sex = 3;
-    string user_phone_number = 4;
-    string user_avatar = 5;
-    string user_wallpaper = 6;
+    string name = 1;
+    int32 birthday = 2;
+    string sex = 3;
+    string phone_number = 4;
+    string avatar = 5;
+    string wallpaper = 6;
 }
 
 message FetchAccountInformation {
-    string user_name = 1;
-    int32 user_birthday = 2;
-    string user_sex = 3;
-    string user_phone_number = 4;
-    string user_email = 5;
-    string user_avatar = 6;
-    string user_wallpaper = 7;
+    string name = 1;
+    int32 birthday = 2;
+    string sex = 3;
+    string phone_number = 4;
+    string email = 5;
+    string avatar = 6;
+    string wallpaper = 7;
 }
 
 message WelcomeMessageRequest {

@@ -33,14 +33,14 @@ type accountInformationServer struct {
 }
 
 type userInfo struct {
-	Id              string    `bson:"_id,omitempty"`
-	Username        string    `bson:"name"`
-	UserSex         string    `bson:"sex"`
-	UserBirthday    time.Time `bson:"birthday"`
-	UserPhoneNumber string    `bson:"phonenumber"`
-	UserEmail       string    `bson:"email"`
-	UserAvatar      string    `bson:"avatar"`
-	UserWallpaper   string    `bson:"wallpaper"`
+	Id          string    `bson:"_id,omitempty"`
+	name        string    `bson:"name"`
+	Sex         string    `bson:"sex"`
+	Birthday    time.Time `bson:"birthday"`
+	PhoneNumber string    `bson:"phonenumber"`
+	Email       string    `bson:"email"`
+	Avatar      string    `bson:"avatar"`
+	Wallpaper   string    `bson:"wallpaper"`
 }
 
 func main() {
@@ -105,7 +105,7 @@ func main() {
 	fmt.Println("End of Program")
 }
 
-func (*accountInformationServer) EditUserInformation(ctx context.Context, in *accountInformationpb.EditUserInformationRequest) (*accountInformationpb.EditUserInformationRespone, error) {
+func (*accountInformationServer) EditInformation(ctx context.Context, in *accountInformationpb.EditUserInformationRequest) (*accountInformationpb.EditUserInformationRespone, error) {
 
 	userEmailCh := make(chan string)
 	userIdCh := make(chan string)
@@ -122,9 +122,9 @@ func (*accountInformationServer) EditUserInformation(ctx context.Context, in *ac
 
 	/// Validate Variables
 	var listString []string = []string{
-		userData.UserName,
-		userData.UserSex,
-		userData.UserPhoneNumber,
+		userData.Name,
+		userData.Sex,
+		userData.PhoneNumber,
 	}
 	validateDoneCh := make(chan bool, len(listString))
 	for _, value := range listString {
@@ -149,16 +149,16 @@ func (*accountInformationServer) EditUserInformation(ctx context.Context, in *ac
 	isInsert := make(chan bool)
 	go func() {
 		replaceFilter := &userInfo{
-			Username:        userData.UserName,
-			UserSex:         userData.UserSex,
-			UserBirthday:    time.Unix(int64(userData.UserBirthday), 0),
-			UserPhoneNumber: userData.UserPhoneNumber,
-			UserAvatar:      userData.UserAvatar,
-			UserWallpaper:   userData.UserWallpaper,
+			name:        userData.Name,
+			Sex:         userData.Sex,
+			Birthday:    time.Unix(int64(userData.Birthday), 0),
+			PhoneNumber: userData.PhoneNumber,
+			Avatar:      userData.Avatar,
+			Wallpaper:   userData.Wallpaper,
 		}
-		replaceFilter.UserEmail = <-userEmailCh
+		replaceFilter.Email = <-userEmailCh
 		replaceFilter.Id = <-userIdCh
-		filter = bson.M{"email": replaceFilter.UserEmail}
+		filter = bson.M{"email": replaceFilter.Email}
 		///Find Server Data
 		serverData := &userInfo{}
 		result := accountInformationCollection.FindOne(context.Background(), filter)
@@ -197,7 +197,7 @@ func (*accountInformationServer) EditUserInformation(ctx context.Context, in *ac
 	}
 }
 
-func (*accountInformationServer) FetchUserInformation(ctx context.Context, in *accountInformationpb.FetchUserInformationRequest) (*accountInformationpb.FetchUserInformationRespone, error) {
+func (*accountInformationServer) FetchInformation(ctx context.Context, in *accountInformationpb.FetchUserInformationRequest) (*accountInformationpb.FetchUserInformationRespone, error) {
 
 	// Get Authorize id
 	id, email, authErr := apiCall.AuthorizationCall(ctx, c)
@@ -215,13 +215,13 @@ func (*accountInformationServer) FetchUserInformation(ctx context.Context, in *a
 	if decodeErr := res.Decode(serverData); decodeErr != nil {
 		return &accountInformationpb.FetchUserInformationRespone{
 			FetchAccountInformation: &accountInformationpb.FetchAccountInformation{
-				UserName:        "User",
-				UserSex:         "Male",
-				UserPhoneNumber: "0",
-				UserEmail:       email,
-				UserBirthday:    int32(time.Now().Unix() - 100000),
-				UserAvatar:      "",
-				UserWallpaper:   "",
+				Name:        "",
+				Sex:         "Male",
+				PhoneNumber: "0",
+				Email:       email,
+				Birthday:    int32(time.Now().Unix() - 100000),
+				Avatar:      "",
+				Wallpaper:   "",
 			},
 		}, nil
 	}
@@ -229,13 +229,13 @@ func (*accountInformationServer) FetchUserInformation(ctx context.Context, in *a
 	//FetchData
 	return &accountInformationpb.FetchUserInformationRespone{
 		FetchAccountInformation: &accountInformationpb.FetchAccountInformation{
-			UserName:        serverData.Username,
-			UserBirthday:    int32(serverData.UserBirthday.Unix()),
-			UserSex:         serverData.UserSex,
-			UserPhoneNumber: serverData.UserPhoneNumber,
-			UserEmail:       email,
-			UserAvatar:      serverData.UserAvatar,
-			UserWallpaper:   serverData.UserWallpaper,
+			Name:        serverData.name,
+			Birthday:    int32(serverData.Birthday.Unix()),
+			Sex:         serverData.Sex,
+			PhoneNumber: serverData.PhoneNumber,
+			Email:       email,
+			Avatar:      serverData.Avatar,
+			Wallpaper:   serverData.Wallpaper,
 		},
 	}, nil
 }
