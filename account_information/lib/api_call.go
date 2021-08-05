@@ -34,5 +34,5 @@ func AuthorizationCall(ctx context.Context, c authenticationpb.AuthenticationSer
 	if errAuth != nil {
 		return "", "", errAuth
 	}
-	return respone.GetObjectId(), respone.GetUserEmail(), nil
+	return respone.GetObjectId(), respone.GetEmail(), nil
 }

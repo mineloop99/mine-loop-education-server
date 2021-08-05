@@ -1,2 +1,2 @@
 # mine-loop-education-server
-Grpc Golang + MongoDB Server Driver
+Run "go run server.go" inside this folder
