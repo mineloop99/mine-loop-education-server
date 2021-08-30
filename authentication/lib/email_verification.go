@@ -27,8 +27,8 @@ func generateRandomCode(max int) string {
 func SendMail(email string) string {
 	verificationCode := generateRandomCode(6)
 	// Sender data.
-	from := "mineloopeducation@gmail.com"
-	password := "Hungthjkju2"
+	from := "example@gmail.com"
+	password := "123456"
 
 	//Recipient
 	////////////////////// Remember to Change
